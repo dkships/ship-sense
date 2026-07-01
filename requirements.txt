@@ -1,0 +1,8 @@
+# Core deps — enough to run `make test` and `make sample` (no API keys needed).
+# Requires Python 3.10+.
+# For a live cross-lab run, also install requirements-live.txt (or `make install-live`).
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+pyyaml>=6.0
+pytest>=8.0
