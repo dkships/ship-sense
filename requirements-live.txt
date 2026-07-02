@@ -1,0 +1,7 @@
+# Provider SDKs — only needed for a LIVE cross-lab run (make live / make refresh),
+# not for tests or `make sample`. Imported lazily in src/providers.py, so the suite
+# runs without them installed. Install with: pip install -r requirements-live.txt
+-r requirements.txt
+anthropic>=0.40
+openai>=1.50
+google-genai>=1.0
