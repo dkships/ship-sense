@@ -98,3 +98,38 @@ def test_difficulty_flags_dead_items():
     assert rep["s0"]["dead"] is True    # both pass
     assert rep["s2"]["dead"] is True    # both fail
     assert rep["s1"]["dead"] is False   # splits
+
+
+def _dim_model(means):
+    # 5 subs per dimension; each `mean` must be a multiple of 0.2 to land exactly.
+    res = []
+    for dim, mean in means.items():
+        k = round(mean * 5)
+        res += [{"item": f"{dim}_x", "sub": f"s{i}", "dimension": dim,
+                 "correct": i < k, "weight": 1.0} for i in range(5)]
+    return res
+
+
+def test_dimension_structure_exposes_effective_weighting():
+    # Restraint and Conviction move together; Honesty moves opposite. Equal weight
+    # then does not mean equal influence: the correlated pair drives the headline
+    # and Honesty is pushed negative despite being one of three equal terms.
+    per_model = {f"m{i}": _dim_model({"restraint": i / 5, "conviction": i / 5,
+                                      "honesty": 1 - i / 5}) for i in range(6)}
+    ds = stats.dimension_structure(per_model, min_models=5)
+    assert ds["n_models"] == 6
+    dims = ds["dims"]
+    ri, hi, ci = dims.index("restraint"), dims.index("honesty"), dims.index("conviction")
+    assert math.isclose(ds["corr"][ri][ci], 1.0, abs_tol=1e-9)    # move together
+    assert math.isclose(ds["corr"][ri][hi], -1.0, abs_tol=1e-9)   # move opposite
+    assert ds["influence"]["honesty"] < 0 < ds["influence"]["restraint"]
+    assert ds["pc1_share"] > 0.99                                 # one latent factor
+
+
+def test_dimension_structure_needs_enough_models_and_spread():
+    few = {f"m{i}": _dim_model({"restraint": i / 5, "honesty": i / 5,
+                                "conviction": i / 5}) for i in range(4)}
+    assert stats.dimension_structure(few, min_models=5) == {}     # too few models
+    flat = {f"m{i}": _dim_model({"restraint": 0.6, "honesty": 0.6,
+                                 "conviction": 0.6}) for i in range(6)}
+    assert stats.dimension_structure(flat, min_models=5) == {}    # no spread to correlate
