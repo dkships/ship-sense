@@ -1,0 +1,31 @@
+# --- Private case bank & keys (real client-derived material; never publish) ---
+cases/*
+keys/*
+# ...except the synthetic, committable schema illustrations:
+!cases/example_*.yaml
+!keys/example_*.yaml
+
+# --- Second-reviewer labels (derived from the private keys) ---
+reviews/
+
+# --- Run outputs (raw model responses may echo private briefs) ---
+outputs/
+
+# --- Secrets ---
+.env
+
+# --- Local agent notes (Claude Code session log; names real clients — never publish) ---
+CLAUDE.md
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# --- Local working notes (reference private item ids; never publish) ---
+notes/
+retired/
+.DS_Store
