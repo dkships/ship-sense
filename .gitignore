@@ -1,0 +1,35 @@
+# --- Private case bank & keys (real client-derived material; never publish) ---
+cases/*
+keys/*
+# ...except the synthetic, committable schema illustrations:
+!cases/example_*.yaml
+!keys/example_*.yaml
+
+# --- Second-reviewer labels (derived from the private keys) ---
+reviews/
+
+# --- Run outputs (raw model responses may echo private briefs) ---
+outputs/
+
+# --- Secrets ---
+# `.env` alone did not cover backups (.env.bak, .env.2026-08-13) — a rotation
+# that saves the old file next to the new one would have left real keys tracked.
+.env
+.env.*
+!.env.example
+
+# --- Local agent notes (Claude Code session log; names real clients — never publish) ---
+CLAUDE.md
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# --- Local working notes (reference private item ids; never publish) ---
+notes/
+retired/
+.DS_Store
