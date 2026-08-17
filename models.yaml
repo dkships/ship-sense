@@ -881,59 +881,56 @@ models:
     # edit; Pro and Flash parse as separate lines so a Flash bump can't retire it.
     label: "DeepSeek V4 Pro"
     released: "2026-04-24"       # api-docs.deepseek.com/news/news260424 (V4 Preview)
-    price_in: 0.435
-    price_out: 0.87
-    price_cached_in: 0.003625    # cache hit; cached ⊂ prompt_tokens (probe-verified)
+    # PEAK/OFF-PEAK APPLIED 2026-08-17. The cell carries the PEAK (undiscounted)
+    # rate — see the reasoning block below the prices.
+    price_in: 1.32               # peak; off-peak $0.66
+    price_out: 3.96              # peak; off-peak $1.98
+    price_cached_in: 0.044       # peak; off-peak $0.022. cached ⊂ prompt_tokens (probe-verified)
     api: chat_completions
     structured_outputs: false    # json_object only on V4 — no json_schema
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
     timeout_s: 900
     batch_supported: false       # DeepSeek has no batch API at all
-    price_verified: "2026-08-13"
+    price_verified: "2026-08-17"
     price_source: "https://api-docs.deepseek.com/quick_start/pricing"
-    # ANNOUNCED CHANGE, NOT YET IN EFFECT. Recorded, deliberately NOT applied.
-    # From 2026-08-16 DeepSeek moves to peak/off-peak billing. Verified verbatim
-    # on the pricing page 2026-08-13: "DeepSeek API pricing will be updated to
-    # peak / off-peak billing, with off-peak rates at half the peak rates. Peak
-    # hours are 01:00 - 04:00 and 06:00 - 10:00 UTC (all other hours are
-    # off-peak)." For v4-pro: off-peak $0.66 in / $1.98 out, peak $1.32 / $3.96.
+    # ANNOUNCED CHANGE, NOW APPLIED. The peak/off-peak move announced for 08-16
+    # LANDED as announced -- it was not cancelled the way Sonnet 5's was. Checked
+    # first-party on the pricing page 2026-08-17, which now renders a peak/off-peak
+    # matrix for deepseek-v4-pro, verbatim: cache-hit input off-peak $0.022 / peak
+    # $0.044; cache-miss input off-peak $0.66 / peak $1.32; output off-peak $1.98 /
+    # peak $3.96. Footnotes, verbatim: "Off-peak rates are half of the peak rates."
+    # and "Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC (all other hours are
+    # off-peak)." Landed numbers match what was recorded pre-effective, exactly.
     #
-    # NOTE THE DIRECTION: this is a steep INCREASE, not a cut. Even the cheapest
-    # new rate (off-peak) is 1.5x today's input and 2.3x today's output; peak is
-    # 3x and 4.6x. DeepSeek is the cheapest model on this board today by a wide
-    # margin, and on 08-16 that story changes -- off-peak lands near Gemini
-    # Flash-Lite, peak lands near Muse Spark. Do not carry forward "cheapest
-    # flagship" language past 08-16 without re-checking.
+    # NOTE THE DIRECTION: this was a steep INCREASE, not a cut -- 3x input and 4.6x
+    # output at peak, and even off-peak is 1.5x/2.3x the old rate. Until 08-16 this
+    # was the cheapest model on the board by a wide margin. It no longer is: peak
+    # now lands near Muse Spark, off-peak near Gemini Flash-Lite. Any "cheapest
+    # flagship" language predating 08-16 is stale -- do not carry it forward.
     #
-    # WHICH RATE BECOMES THE CELL: peak. A single-number column has to pick one,
-    # and off-peak is a DISCOUNT YOU BUY WITH LATENCY -- you get it by scheduling
-    # work into 17 of the 24 UTC hours. That is structurally the same trade as the
-    # Batch API discount, and this board already has a settled convention for it:
-    # every batching model shows its LIST price, not the 50%-off batch price, even
-    # though most official runs are batched. Peak is the undiscounted list rate,
-    # so peak goes in the cell and the off-peak rate belongs in the footnote. This
-    # also never understates buying advice, which is the failure mode that matters
-    # for a column feeding the "Choosing a model?" callout.
+    # WHY THE CELL IS PEAK: a single-number column has to pick one rate, and
+    # off-peak is a DISCOUNT YOU BUY WITH LATENCY -- you get it by scheduling work
+    # into 17 of the 24 UTC hours. That is structurally the same trade as the Batch
+    # API discount, and this board already has a settled convention for it: every
+    # batching model shows its LIST price, not the 50%-off batch price, even though
+    # most official runs are batched. Peak is the undiscounted list rate, so peak
+    # goes in the cell and off-peak belongs in the footnote. This also never
+    # understates buying advice, which is the failure mode that matters for a
+    # column feeding the "Choosing a model?" callout.
     #
-    # WHY IT IS NOT APPLIED TODAY: the column is CURRENT list price. Today's price
-    # is $0.435/$0.87 and that is what a buyer pays until 08-16. Rolling a future
-    # price into a buyer-facing cell is exactly the error the Sonnet 5 entry above
-    # documents -- and Sonnet 5 is the proof that announced changes get CANCELLED.
-    # So this is recorded, not applied, and `test_no_price_is_past_its_announced_
-    # change_date` fails once 08-16 arrives with price_verified still older than
-    # it. That forces a fresh first-party check on the day, which catches both
-    # outcomes: it happened, or it was cancelled like Sonnet 5's.
-    price_pending:
-      effective: "2026-08-16"
-      kind: peak_offpeak
-      list_basis: peak           # the undiscounted rate = the cell, like batch
-      price_in: 1.32             # peak
-      price_out: 3.96            # peak
-      price_cached_in: 0.044     # peak
-      offpeak_price_in: 0.66
-      offpeak_price_out: 1.98
-      offpeak_price_cached_in: 0.022
+    # OFF-PEAK RATES ARE KEPT BELOW, not dropped with the pending block: the cell
+    # is only half the story once a model bills on a clock, and a reader comparing
+    # DeepSeek to Flash-Lite needs the other half. `price_offpeak` is descriptive
+    # only -- no code path reads it, and cost accounting in providers.py stays on
+    # the peak `price_in`/`price_out`/`price_cached_in` above, which is the
+    # conservative basis (it can overstate a batched overnight run's cost, never
+    # understate it).
+    price_offpeak:
+      price_in: 0.66
+      price_out: 1.98
+      price_cached_in: 0.022
       peak_hours_utc: "01:00-04:00 and 06:00-10:00"
+      note: "off-peak = half of peak; all hours outside peak_hours_utc"
       source: "https://api-docs.deepseek.com/quick_start/pricing"
 
   # --- Deterministic, no network. Used by tests + scaffold + the gameability floor. ---
