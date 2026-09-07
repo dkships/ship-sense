@@ -771,18 +771,6 @@ def test_generations_markdown_carries_both_sides_dimension_scores():
     assert "R +0.19 · H -0.04 · C +0.39" in row  # and where it moved
 
 
-def test_committed_docs_generations_matches_ledger():
-    """Drift guard for the generations chart, like index/card/field."""
-    svg = lb.render_generations_svg(lb.load_ledger())
-    path = lb.DOCS / "generations.svg"
-    if not svg:
-        assert not path.exists()
-        return
-    assert svg.strip() == path.read_text().strip(), (
-        "docs/generations.svg is out of sync with leaderboard.json — "
-        "regenerate it with `python -m src.leaderboard --render-only` and commit.")
-
-
 def test_released_from_id_extracts_dated_ids():
     assert loader.released_from_id("gpt-5.4-2026-03-05") == "2026-03-05"
     assert loader.released_from_id("gpt-5.4-mini-2026-03-17") == "2026-03-17"

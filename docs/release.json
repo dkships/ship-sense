@@ -1,7 +1,7 @@
 {
-  "version": "v3.5",
+  "version": "v3.5.1",
   "released_on": "2026-09-06",
-  "release_type": "evidence_correction",
+  "release_type": "scoring_update",
   "score_status": "unvalidated",
   "ranking_eligible": false,
   "score_version": "v3.1-candidate",
@@ -30,6 +30,12 @@
     "candidate-sensitivity.json": "6ed10e80840bd68dcae5c88824d5506a5f96daf9667061e67ca950cbe70658de",
     "review-audit.json": "2eb783568fd9793df103d4fa67f99347f742befeb4a7c462adaee2aa0ea2c6c7",
     "screening.json": "4f6dc4af358eb064da398cd081f3733bf6b4b1c13d08cdbe95d63cec58478c0a",
-    "revision-screening.json": "091673fa26e8fcc9f4787043bb3ae0cf74c72af7e53d4634d21b5078adebb557"
-  }
+    "revision-screening.json": "091673fa26e8fcc9f4787043bb3ae0cf74c72af7e53d4634d21b5078adebb557",
+    "decision-inputs.json": "9af95cb3dfba523f1592365eba5703c075372be187647917d7cd26cf75b36917",
+    "decision-scores.json": "3f33727fc3dbc0d39b3c11db9f842caf06da09302faa0062f1132a039e577a7b",
+    "decision-scores.csv": "10b28534b3e56fa91b1b88213b9976a4becba34aa6bb553dc8365543b40423fe"
+  },
+  "primary_metric": "decision",
+  "primary_score_version": "decision-v1",
+  "historical_score_status_note": "score_status and ranking_eligible describe the frozen three-dimension candidate; Decision scores are published separately."
 }

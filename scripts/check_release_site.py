@@ -1,4 +1,4 @@
-"""Check the release page and provisional score audit in desktop and mobile Chromium."""
+"""Check the scorecard, model coverage, charts and disclosures in Chromium."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -18,54 +18,85 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 def check_page(page, base, output, width, height):
     errors = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
-    page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
-    page.on("requestfailed", lambda request: errors.append(request.url))
-    page.set_viewport_size({"width": width, "height": height})
-    response = page.goto(base, wait_until="networkidle")
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.on('console', lambda message: errors.append(message.text) if message.type == 'error' else None)
+    page.on('requestfailed', lambda request: errors.append(request.url))
+    page.set_viewport_size({'width': width, 'height': height})
+    response = page.goto(base, wait_until='networkidle')
     assert response.status == 200
-    assert page.get_by_text("Provisional scores. No validated model ranking.").is_visible()
-    assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
-    page.screenshot(path=str(output / f"release-{width}.png"), full_page=True)
-    for link in page.locator("a").all():
-        href = link.get_attribute("href")
-        if href and not href.startswith(("http:", "https:", "#")):
+    assert page.get_by_role('heading', name='Product judgment, under uncertainty').is_visible()
+    assert page.locator('.focal .fscore').is_visible()
+    assert '95% CI' in page.locator('.focal').inner_text()
+    assert page.locator('#model-scores tbody tr').count() == 18
+    assert page.locator('#previous-scores tbody tr').count() == 14
+    assert page.locator('.gcard').count() == 14
+    assert page.locator('.matrix tbody tr').count() == 17
+    assert not page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
+    scores = json.loads((ROOT / 'docs/decision-scores.json').read_text())
+    for model in scores['models']:
+        if model['is_baseline']:
+            continue
+        row = page.locator(f'tr[data-model="{model["name"]}"]')
+        assert row.count() == 1
+        assert row.locator('.score .num').inner_text() == f'{model["score"]["value"]:.1f}'
+        assert '95% CI' in row.locator('.score').inner_text()
+    page.screenshot(path=str(output / f'first-screen-{width}.png'))
+    page.screenshot(path=str(output / f'scores-{width}.png'), full_page=True)
+    page.locator('nav.jump').get_by_role('link', name='Leaderboard', exact=True).click()
+    assert page.url.endswith('#leaderboard')
+    page.locator('#leaderboard').screenshot(path=str(output / f'leaderboard-{width}.png'))
+    previous = page.locator('#generations details')
+    previous.locator('summary').click()
+    assert not page.locator('#previous-scores').is_visible()
+    previous.locator('summary').press('Enter')
+    assert page.locator('#previous-scores').is_visible()
+    page.locator('#limits summary').click()
+    assert page.get_by_text('Scoring details and reproducibility', exact=True).is_visible()
+    assert 'public inputs' in page.locator('#limits details').inner_text()
+    for link in page.locator('a').all():
+        href = link.get_attribute('href')
+        if href and not href.startswith(('http:', 'https:', '#')):
             assert page.request.get(base + href).status == 200, href
-    page.get_by_role("link", name="Provisional scores and intervals").click()
-    page.wait_for_load_state("networkidle")
-    assert page.get_by_text("Provisional results. No official ranking.").is_visible()
-    assert page.locator("tbody tr").count() == 32
-    assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
-    page.locator("summary").click()
-    assert page.get_by_text("465 candidate comparisons").is_visible()
-    page.screenshot(path=str(output / f"scores-{width}.png"), full_page=True)
+    page.get_by_role('link', name='Previous overall and grading audit', exact=True).click()
+    page.wait_for_load_state('networkidle')
+    assert page.get_by_text('Provisional results. No official ranking.').is_visible()
+    assert page.locator('tbody tr').count() == 32
+    assert not page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     assert not errors, errors
-    return {"viewport": [width, height], "console_errors": errors, "overflow": False, "score_rows": 32}
+    return {'viewport': [width, height], 'console_errors': errors, 'overflow': False,
+            'current_rows': 18, 'previous_rows': 14, 'generation_cards': 14,
+            'matrix_rows': 17, 'all_model_scores_match': True, 'historical_scores': 'passed'}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(QuietHandler, directory=str(ROOT / "docs")))
+    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(QuietHandler, directory=str(ROOT / 'docs')))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
-            base = f"http://127.0.0.1:{server.server_port}/"
+            base = f'http://127.0.0.1:{server.server_port}/'
             results = []
             for width, height in ((1440, 1000), (390, 844)):
-                page = browser.new_page()
+                page = browser.new_page(java_script_enabled=False)
                 results.append(check_page(page, base, args.output, width, height))
+                page.goto(base + 'history/v3.0/docs/index.html', wait_until='networkidle')
+                page.screenshot(path=str(args.output / f'original-first-screen-{width}.png'))
                 page.close()
+            page = browser.new_page(viewport={'width':1200,'height':630}, device_scale_factor=1)
+            page.goto(base + 'card.svg', wait_until='networkidle')
+            page.screenshot(path=str(args.output / 'card.png'), omit_background=False)
+            page.close()
             browser.close()
-        (args.output / "checks.json").write_text(json.dumps(results, indent=2) + "\n")
+        (args.output / 'checks.json').write_text(json.dumps(results, indent=2) + '\n')
         print(json.dumps(results, indent=2))
     finally:
         server.shutdown()
         server.server_close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
