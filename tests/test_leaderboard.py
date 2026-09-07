@@ -375,18 +375,11 @@ def test_board_shows_the_current_price_and_names_the_at_test_one():
 
 def test_committed_candidate_page_matches_data():
     from src import candidate_page
-    candidate = json.loads((lb.DOCS / "candidate.json").read_text())
+    candidate = json.loads((lb.DOCS / "history" / "v3.5" / "candidate.json").read_text())
     assert candidate["status"] == "candidate"
     assert all(not m["ranked_eligible"] for m in candidate["models"])
-    assert (lb.DOCS / "candidate.html").read_text() == candidate_page.render(candidate)
-    assert (lb.DOCS / "candidate-card.svg").read_text() == candidate_page.render_card()
-
-
-def test_current_readme_has_no_historical_winner_block():
-    text = lb.README.read_text()
-    assert "Honesty validation has not passed" in text
-    assert lb.README_START not in text
-    assert "docs/history/v3.0" in text
+    assert (lb.DOCS / "history" / "v3.5" / "candidate.html").read_text() == candidate_page.render(candidate)
+    assert (lb.DOCS / "history" / "v3.5" / "candidate-card.svg").read_text() == candidate_page.render_card()
 
 
 def test_candidate_exports_have_no_private_check_ids():

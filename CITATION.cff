@@ -1,4 +1,4 @@
-cff-version: 1.2.0
+cff-version: v3.6
 message: "If you reference Ship Sense, please cite it as below."
 title: "Ship Sense: a product-judgment eval for frontier models"
 type: software
@@ -7,5 +7,5 @@ authors:
     given-names: David
 repository-code: "https://github.com/dkships/ship-sense"
 license: MIT
-version: "3.5.1"
-date-released: "2026-09-06"
+version: v3.6
+date-released: 2026-09-07

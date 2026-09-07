@@ -9,7 +9,7 @@ from pathlib import Path
 from . import pairwise, stats
 from .task_score import read_json
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+DOCS = Path(__file__).resolve().parents[1] / "docs" / "history" / "v3.5"  # v3.5.x Decision-score artifacts (historical)
 DIMENSIONS = ("restraint", "conviction")
 BOOTSTRAPS = 10_000
 SEED = 310904

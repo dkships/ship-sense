@@ -78,7 +78,7 @@ def render_card() -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate", type=Path, default=ROOT / "docs/candidate.json")
+    parser.add_argument("--candidate", type=Path, default=ROOT / "docs/history/v3.5/candidate.json")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/index.html")
     args = parser.parse_args()
     args.output.write_text(render(json.loads(args.candidate.read_text())))

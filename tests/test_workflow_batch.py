@@ -14,8 +14,8 @@ def prepared(tmp_path, monkeypatch):
         target = tmp_path / "src" / (name + ".py")
         target.parent.mkdir(exist_ok=True)
         target.write_bytes((source / "src" / (name + ".py")).read_bytes())
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs/decision-inputs.json").write_text('{"synthetic":"sealed"}')
+    (tmp_path / "docs/history/v3.5").mkdir(parents=True)
+    (tmp_path / "docs/history/v3.5/decision-inputs.json").write_text('{"synthetic":"sealed"}')
     monkeypatch.setattr(runner, "ROOT", tmp_path)
     monkeypatch.setattr(runner.batch, "ROOT", tmp_path)
     monkeypatch.setattr(runner.transport, "ROOT", tmp_path)
@@ -135,7 +135,7 @@ def test_preparation_blinds_keys_and_seals_both_phases(prepared):
     assert runner.read(folder / "subject/records.json")[0]["output_bound"] == 128
 
 
-@pytest.mark.parametrize("target", ["tasks.json", "plan.json", "src/workflow_score.py", "notes/workflow-pack/subject/anthropic/requests.jsonl", "prior-budget.json", "docs/decision-inputs.json"])
+@pytest.mark.parametrize("target", ["tasks.json", "plan.json", "src/workflow_score.py", "notes/workflow-pack/subject/anthropic/requests.jsonl", "prior-budget.json", "docs/history/v3.5/decision-inputs.json"])
 def test_sealed_inputs_and_old_holds_cannot_change(prepared, target):
     folder = prepare(prepared)
     path = runner.ROOT / target
