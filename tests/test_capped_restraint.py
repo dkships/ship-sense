@@ -66,5 +66,8 @@ def test_every_restraint_case_feature_ids_match_key_labels():
             continue
         feat_ids = {f["id"] for f in item.get("features", [])}
         label_ids = set(item["_key"].get("labels", {}))
-        assert feat_ids == label_ids, (
-            f"{item['id']}: feature/label id mismatch on {feat_ids ^ label_ids}")
+        excluded = item["_key"].get("excluded_checks", {})
+        assert all(reason for reason in excluded.values())
+        assert not label_ids & set(excluded)
+        assert feat_ids == label_ids | set(excluded), (
+            f"{item['id']}: every feature needs a label or documented exclusion")

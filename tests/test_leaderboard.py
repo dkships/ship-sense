@@ -373,36 +373,27 @@ def test_board_shows_the_current_price_and_names_the_at_test_one():
         assert "current list price" in blob
 
 
-def test_committed_docs_index_matches_ledger():
-    """The committed public page must be a pure regeneration of the committed ledger.
-    A manual `make refresh` can then never ship a stale or hand-edited leaderboard:
-    if docs/index.html drifts from leaderboard.json, this fails."""
-    html = lb.render_html(lb.load_ledger())
-    committed = (lb.DOCS / "index.html").read_text()
-    assert html.strip() == committed.strip(), (
-        "docs/index.html is out of sync with leaderboard.json — "
-        "regenerate it with `make leaderboard RUN_ID=<latest>` and commit.")
+def test_committed_candidate_page_matches_data():
+    from src import candidate_page
+    candidate = json.loads((lb.DOCS / "candidate.json").read_text())
+    assert candidate["status"] == "candidate"
+    assert all(not m["ranked_eligible"] for m in candidate["models"])
+    assert (lb.DOCS / "candidate.html").read_text() == candidate_page.render(candidate)
+    assert (lb.DOCS / "candidate-card.svg").read_text() == candidate_page.render_card()
 
 
-def test_committed_readme_block_matches_ledger():
-    """The README leaderboard block (the repo landing page IS the public surface)
-    must be a pure regeneration of the committed ledger, like docs/."""
+def test_current_readme_has_no_historical_winner_block():
     text = lb.README.read_text()
-    assert lb.README_START in text and lb.README_END in text
-    block = text.split(lb.README_START)[1].split(lb.README_END)[0].strip()
-    assert block == lb.render_markdown(lb.load_ledger()).strip(), (
-        "README leaderboard block is out of sync with leaderboard.json — "
-        "regenerate it with `python -m src.leaderboard --render-only` and commit.")
+    assert "Honesty validation has not passed" in text
+    assert lb.README_START not in text
+    assert "docs/history/v3.0" in text
 
 
-def test_committed_docs_card_matches_ledger():
-    """Same drift guard for the share card: docs/card.svg must be a pure
-    regeneration of the committed ledger."""
-    svg = lb.render_card_svg(lb.load_ledger())
-    committed = (lb.DOCS / "card.svg").read_text()
-    assert svg.strip() == committed.strip(), (
-        "docs/card.svg is out of sync with leaderboard.json — "
-        "regenerate it with `python -m src.leaderboard --render-only` and commit.")
+def test_candidate_exports_have_no_private_check_ids():
+    private_ids = {it["id"] for it in loader.load_cases()
+                   if not loader.is_example_id(it["id"])}
+    blob = "".join(p.read_text() for p in lb.DOCS.glob("candidate*.json"))
+    assert not any(item_id in blob for item_id in private_ids)
 
 
 def test_split_generations_retires_only_on_a_ranked_successor():

@@ -3,8 +3,8 @@
 # Run via `make publish-check`. Exits non-zero on any failure.
 #
 # The one risk this cannot fix: this repo's git HISTORY predates the privacy
-# split and contains client-derived names. Publishing is therefore a FRESH
-# single-commit export (`make export-public`), never a push of this history.
+# split and contains client-derived names. Copy safe files into the existing
+# public checkout; never push this private history to a public remote.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PY:-.venv/bin/python}
@@ -48,14 +48,14 @@ done
 # 5. LICENSE exists.
 [ -f LICENSE ] && ok "LICENSE present" || bad "LICENSE missing"
 
-# 6. Working tree clean: export-public ships committed HEAD via `git archive`, so
+# 6. Working tree clean: export-public copies only a clean committed source tree, so
 #    a dirty tree would silently publish stale content while looking current.
-[ -z "$(git status --porcelain)" ] && ok "working tree clean (export ships HEAD)" \
-  || bad "working tree dirty — commit first; export-public ships committed HEAD only"
+[ -z "$(git status --porcelain)" ] && ok "working tree clean (export copies committed files)" \
+  || bad "working tree dirty — review and commit before export"
 
 if [ "$fail" -ne 0 ]; then
   say ""; say "Preflight FAILED — fix before any publish."; exit 1
 fi
 say ""
-say "Preflight passed. REMINDER: publish only via 'make export-public' (fresh"
-say "single-commit repo). Never 'git push' this repo's history to a public remote."
+say "Preflight passed. Copy safe files with make export-public, then review the public diff."
+say "Never push this private repository's history to a public remote."

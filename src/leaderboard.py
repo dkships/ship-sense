@@ -226,9 +226,9 @@ def definition_signature(items: list[dict], case_scope: str) -> dict:
 
 
 def scorer_hash() -> str:
-    """Fingerprint deterministic grade + headline-score code, with filenames."""
+    """Fingerprint the key loader, claim matcher, grading, and statistics code."""
     h = hashlib.sha256()
-    for name in ("grade.py", "stats.py"):
+    for name in ("grade.py", "claims.py", "loader.py", "stats.py", "pairwise.py"):
         path = CODE_ROOT / "src" / name
         h.update(name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
     return f"sha256:{h.hexdigest()}"
@@ -303,6 +303,11 @@ def build_snapshot(run_id: str, per_model: dict[str, list[dict]],
                    meta: dict[str, dict], run_date: str | None = None,
                    case_scope: str = loader.CASE_SCOPE_ALL) -> dict:
     """Assemble one ledger run object from a set of graded results."""
+    from collections import Counter
+    from . import complete
+    release_blocked = bool(complete.publication_errors(run_id))
+    defaults, registry = loader.load_models()
+    providers = {m["name"]: m["provider"] for m in registry}
     scoped = {name: results for name, results
               in loader.filter_per_model(per_model, case_scope).items() if results}
     summary = summarize(scoped)
@@ -334,7 +339,12 @@ def build_snapshot(run_id: str, per_model: dict[str, list[dict]],
         dims_present = {r["dimension"] for r in results}
         coverage_ratio = (n_items / bank_n) if bank_n else 0.0
         check_coverage_ratio = ((n_checks / bank_checks) if bank_checks else None)
+        generations = 1 if providers.get(name) == "mock" else int(defaults.get("generations", 1))
+        counts = Counter((r["item"], r["dimension"], r["sub"]) for r in results)
+        generation_complete = (expected_checks is not None and
+                               counts == Counter({c: generations for c in expected_checks}))
         ranked_eligible = (not baseline and bank_n > 0
+                           and not release_blocked and generation_complete
                            and coverage_ratio >= RANKED_COVERAGE_MIN
                            and (check_coverage_ratio is None
                                 or check_coverage_ratio >= RANKED_COVERAGE_MIN)
@@ -2096,7 +2106,7 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
         coverage_note = (f' Provisional rows: {who} did not meet the '
                          f'{int(RANKED_COVERAGE_MIN * 100)}% coverage/all-dimensions '
                          "eligibility gate. Missing items are left ungraded, not counted "
-                         "wrong, so read provisional scores as upper bounds.")
+                         "wrong. These coverage-limited estimates can differ from complete scores in either direction.")
 
     pairwise_section = ""
     if pairwise:
@@ -2111,8 +2121,8 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
 <p class="lead-in">Point scores rank; paired tests separate. Each cell replays the same items
 for both models and asks whether the difference survives a sign-flip test with Holm correction
 across the whole family. Of {len(pairwise)} comparisons, {n_decisive} are decisive; the best
-single record is {top_wins} decisive wins. Every other pair on this board is statistically
-inseparable.{gens_note}</p>
+single record is {top_wins} decisive wins. For every other pair, this test does not detect a difference; it does not establish
+equivalence.{gens_note}</p>
 {_pairwise_matrix(pairwise, ranked)}
 </section>"""
 
@@ -2565,6 +2575,14 @@ def write_pages(ledger: dict) -> None:
     """Regenerate every public artifact from the ledger (the only writer)."""
     DOCS.mkdir(exist_ok=True)
     (DOCS / ".nojekyll").touch()
+    candidate_path = DOCS / "candidate.json"
+    if candidate_path.exists():
+        candidate = json.loads(candidate_path.read_text())
+        if candidate.get("status") == "candidate":
+            from . import candidate_page
+            (DOCS / "index.html").write_text(candidate_page.render(candidate))
+            (DOCS / "card.svg").write_text(candidate_page.render_card())
+            return
     runs = ledger.get("runs", [])
     if runs:
         # Publish the corrected head-to-head records (model-level aggregates only —
@@ -2617,6 +2635,11 @@ def main():
     per_model = report.load_scores(args.run_id, loader.CASE_SCOPE_ALL)
     if not per_model:
         ap.error(f"no scores under outputs/{args.run_id}/scores/ — run the eval first")
+    from . import complete
+    errors = (complete.completeness_errors(args.run_id, list(per_model), args.case_scope)
+              + complete.publication_errors(args.run_id))
+    if errors:
+        ap.error("publication checks failed:\n  - " + "\n  - ".join(errors))
     meta = loader.model_meta()
     snapshot = build_snapshot(args.run_id, per_model, meta, case_scope=args.case_scope)
     ledger = load_ledger(Path(args.ledger))

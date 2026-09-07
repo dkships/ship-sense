@@ -15,6 +15,8 @@ reviewer believes should be credited/penalized.
 """
 from __future__ import annotations
 
+import json
+import math
 import yaml
 
 from . import loader
@@ -48,12 +50,11 @@ def _ids(values) -> list[str]:
 
 
 def _honesty_labels(doc: dict) -> dict:
-    out = {}
-    for lm in _ids(doc.get("landmines")):
-        out[f"{doc['id']}:landmine:{lm}"] = "FLAG"
-    for fa in _ids(doc.get("false_alarms")):
-        out[f"{doc['id']}:falsealarm:{fa}"] = "PENALIZE"
-    return out
+    # Naming an existing check does not constitute a validity decision.
+    values = doc.get("check_validity") or {}
+    if not all(isinstance(v, bool) for v in values.values()):
+        raise ValueError("Honesty check_validity must contain explicit booleans")
+    return {f"{doc['id']}:{check}": value for check, value in values.items()}
 
 
 def _labels(doc: dict) -> dict:
@@ -69,6 +70,10 @@ def _labels(doc: dict) -> dict:
 def author_labels() -> dict:
     out = {}
     for doc in loader._load_dir(loader.KEYS_DIR).values():
+        if doc.get("type") == "honesty":
+            doc = dict(doc, check_validity={
+                **{f"landmine:{c}": True for c in _ids(doc.get("landmines"))},
+                **{f"falsealarm:{c}": True for c in _ids(doc.get("false_alarms"))}})
         out.update(_labels(doc))
     return out
 
@@ -77,25 +82,50 @@ def reviewer_labels() -> dict:
     out = {}
     if REVIEWS.exists():
         for p in sorted(REVIEWS.glob("*.yaml")):
-            out.update(_labels(yaml.safe_load(p.read_text()) or {}))
+            doc = yaml.safe_load(p.read_text()) or {}
+            if doc.get("review_status") != "complete":
+                continue
+            labels = _labels(doc)
+            if set(out) & set(labels):
+                raise ValueError("overlapping reviewer files; compare one reviewer at a time")
+            out.update(labels)
     return out
+
+
+def agreement(author: dict, reviewer: dict) -> dict:
+    """Account for the union of checks in every case the reviewer touched."""
+    reviewed_cases = {key.split(":", 1)[0] for key in reviewer}
+    expected = {key for key in author if key.split(":", 1)[0] in reviewed_cases}
+    shared = sorted(expected & set(reviewer))
+    missing, extra = expected - set(reviewer), set(reviewer) - expected
+    a, b = [author[k] for k in shared], [reviewer[k] for k in shared]
+    value = None
+    if shared and not missing and not extra and len(set(a) | set(b)) > 1:
+        raw_kappa = cohen_kappa(a, b)
+        value = raw_kappa if math.isfinite(raw_kappa) else None
+    return {"n_expected": len(expected), "n_reviewed": len(shared),
+            "n_missing": len(missing), "n_extra": len(extra),
+            "coverage": len(shared) / len(expected) if expected else 0.0,
+            "agreement": sum(x == y for x, y in zip(a, b)) / len(shared) if shared else None,
+            "kappa": value}
 
 
 def main():
     author, reviewer = author_labels(), reviewer_labels()
-    shared = sorted(set(author) & set(reviewer))
-    if not shared:
-        print("κ pending — no overlapping second-reviewer labels found in reviews/.")
-        print("The scorecard reports this honestly. To enable κ: add reviews/<name>.yaml")
-        print("(same schema as a key) labeling a ~20% subset, then re-run `make kappa`.")
+    if not reviewer:
+        print("κ pending — no completed second-reviewer decisions found in reviews/.")
+        print("Mark review_status: complete only after every intended check is reviewed.")
         return
-    a = [author[k] for k in shared]
-    b = [reviewer[k] for k in shared]
-    k = cohen_kappa(a, b)
-    bar = ("substantial+ (publishable)" if k >= 0.75
-           else "moderate (weak for ranking claims)" if k >= 0.6
-           else "low — keys are noisy")
-    print(f"Cohen's κ over {len(shared)} labeled items: {k:.3f} — {bar}")
+    # Keep categorical decisions and binary check-validity judgments separate.
+    key_types = {name: doc["type"] for name, doc in loader._load_dir(loader.KEYS_DIR).items()}
+    summaries = {}
+    for dimension in ("restraint", "honesty", "conviction"):
+        a = {k: v for k, v in author.items() if key_types.get(k.split(":", 1)[0]) == dimension}
+        b = {k: v for k, v in reviewer.items() if key_types.get(k.split(":", 1)[0]) == dimension}
+        summaries[dimension] = agreement(a, b)
+    unknown = sum(k.split(":", 1)[0] not in key_types for k in reviewer)
+    print(json.dumps({"dimensions": summaries, "unknown_review_checks": unknown,
+                      "note": "null kappa means missing coverage or no identifiable chance-adjusted agreement"}, indent=2))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Ship Sense v3.1 validation candidate; official ranking pending">
+<rect width="1200" height="630" fill="#141b17"/><rect x="70" y="90" width="8" height="450" fill="#ffb078"/>
+<g fill="#edf1e8" font-family="system-ui,sans-serif"><text x="110" y="150" font-size="26">SHIP SENSE</text>
+<text x="110" y="270" font-size="68" font-weight="700">v3.1 validation candidate</text>
+<text x="110" y="355" font-size="32">Saved answers. Source and grading corrections.</text>
+<text x="110" y="420" font-size="32" fill="#ffb078">Official ranking pending.</text>
+<text x="110" y="510" font-size="24" fill="#b1bdaf">31 models · 59 retained cases · no new benchmark calls</text></g></svg>

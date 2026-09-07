@@ -1,0 +1,597 @@
+{
+  "status": "diagnostic_only",
+  "official": false,
+  "full_regrade_submitted": false,
+  "acceptance_enabled": false,
+  "diagnostic_thresholds_passed": false,
+  "frozen_gates_passed": false,
+  "all_responses_valid": false,
+  "providers": {
+    "openai": {
+      "control_accuracy": {
+        "count": 191,
+        "total": 192,
+        "clusters": 8,
+        "value": 0.9947916666666666,
+        "lo": 0.984375,
+        "hi": 1.0
+      },
+      "failure_recall": {
+        "count": 119,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.9916666666666667,
+        "lo": 0.975,
+        "hi": 1.0
+      },
+      "control_clear_coverage": {
+        "count": 192,
+        "total": 192,
+        "clusters": 8,
+        "value": 1.0,
+        "lo": 1.0,
+        "hi": 1.0
+      },
+      "critical_false_pass_rate": {
+        "count": 1,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.008333333333333333,
+        "lo": 0.0,
+        "hi": 0.025
+      },
+      "invariance": {
+        "identity_Anthropic": {
+          "agreement": {
+            "count": 148,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.925,
+            "lo": 0.8881977361882969,
+            "hi": 0.9588235294117647
+          },
+          "resolved_pairs": {
+            "count": 147,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.91875,
+            "lo": 0.8581560283687943,
+            "hi": 0.9627329192546584
+          },
+          "clear_binary_flips": {
+            "count": 5,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.03125,
+            "lo": 0.011235955056179775,
+            "hi": 0.054878048780487805
+          }
+        },
+        "identity_Google": {
+          "agreement": {
+            "count": 142,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.8875,
+            "lo": 0.81875,
+            "hi": 0.9470588235294117
+          },
+          "resolved_pairs": {
+            "count": 145,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.90625,
+            "lo": 0.8410596026490066,
+            "hi": 0.9575757575757575
+          },
+          "clear_binary_flips": {
+            "count": 7,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.04375,
+            "lo": 0.012578616352201259,
+            "hi": 0.08046169868086088
+          }
+        },
+        "identity_OpenAI": {
+          "agreement": {
+            "count": 151,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.94375,
+            "lo": 0.9132947976878613,
+            "hi": 0.9735099337748344
+          },
+          "resolved_pairs": {
+            "count": 148,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.925,
+            "lo": 0.8529366654637315,
+            "hi": 0.9748427672955975
+          },
+          "clear_binary_flips": {
+            "count": 5,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.03125,
+            "lo": 0.00625,
+            "hi": 0.06134969325153374
+          }
+        },
+        "reordered": {
+          "agreement": {
+            "count": 143,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.89375,
+            "lo": 0.8291139240506329,
+            "hi": 0.9454545454545454
+          },
+          "resolved_pairs": {
+            "count": 146,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.9125,
+            "lo": 0.8451612903225807,
+            "hi": 0.9629629629629629
+          },
+          "clear_binary_flips": {
+            "count": 5,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.03125,
+            "lo": 0.006172839506172839,
+            "hi": 0.0641025641025641
+          }
+        },
+        "repeated": {
+          "agreement": {
+            "count": 143,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.89375,
+            "lo": 0.8333333333333334,
+            "hi": 0.937888198757764
+          },
+          "resolved_pairs": {
+            "count": 144,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.9,
+            "lo": 0.8321665560716656,
+            "hi": 0.9529411764705882
+          },
+          "clear_binary_flips": {
+            "count": 5,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.03125,
+            "lo": 0.011494252873563218,
+            "hi": 0.05454793840039738
+          }
+        }
+      },
+      "transitions": {
+        "pass->fail": 14,
+        "pass->unresolved": 24,
+        "fail->pass": 13,
+        "unresolved->pass": 16,
+        "unresolved->fail": 5,
+        "fail->unresolved": 1
+      },
+      "issue_counts": {
+        "key_support_unresolved": 42,
+        "nonliteral_source_quote": 31,
+        "nonliteral_or_mislocated_answer_quote": 2
+      },
+      "valid_responses": 256,
+      "invalid_responses": 0
+    },
+    "anthropic": {
+      "control_accuracy": {
+        "count": 187,
+        "total": 192,
+        "clusters": 8,
+        "value": 0.9739583333333334,
+        "lo": 0.9479166666666666,
+        "hi": 0.9947916666666666
+      },
+      "failure_recall": {
+        "count": 117,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.975,
+        "lo": 0.9416666666666667,
+        "hi": 1.0
+      },
+      "control_clear_coverage": {
+        "count": 187,
+        "total": 192,
+        "clusters": 8,
+        "value": 0.9739583333333334,
+        "lo": 0.9479166666666666,
+        "hi": 0.9947916666666666
+      },
+      "critical_false_pass_rate": {
+        "count": 0,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.0,
+        "lo": 0.0,
+        "hi": 0.0
+      },
+      "invariance": {
+        "identity_Anthropic": {
+          "agreement": {
+            "count": 131,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.81875,
+            "lo": 0.7435897435897436,
+            "hi": 0.8910256410256411
+          },
+          "resolved_pairs": {
+            "count": 124,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.775,
+            "lo": 0.7025316455696202,
+            "hi": 0.8445945945945946
+          },
+          "clear_binary_flips": {
+            "count": 1,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.00625,
+            "lo": 0.0,
+            "hi": 0.01948051948051948
+          }
+        },
+        "identity_Google": {
+          "agreement": {
+            "count": 124,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.775,
+            "lo": 0.6944400212314225,
+            "hi": 0.8561655027307726
+          },
+          "resolved_pairs": {
+            "count": 113,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.70625,
+            "lo": 0.621301775147929,
+            "hi": 0.7945205479452054
+          },
+          "clear_binary_flips": {
+            "count": 1,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.00625,
+            "lo": 0.0,
+            "hi": 0.01910828025477707
+          }
+        },
+        "identity_OpenAI": {
+          "agreement": {
+            "count": 131,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.81875,
+            "lo": 0.7161270410195142,
+            "hi": 0.9064777848051229
+          },
+          "resolved_pairs": {
+            "count": 114,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.7125,
+            "lo": 0.577375,
+            "hi": 0.8235294117647058
+          },
+          "clear_binary_flips": {
+            "count": 0,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.0,
+            "lo": 0.0,
+            "hi": 0.0
+          }
+        },
+        "reordered": {
+          "agreement": {
+            "count": 117,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.73125,
+            "lo": 0.6118421052631579,
+            "hi": 0.8352289438502674
+          },
+          "resolved_pairs": {
+            "count": 114,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.7125,
+            "lo": 0.5953757225433526,
+            "hi": 0.8152866242038217
+          },
+          "clear_binary_flips": {
+            "count": 1,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.00625,
+            "lo": 0.0,
+            "hi": 0.01935483870967742
+          }
+        },
+        "repeated": {
+          "agreement": {
+            "count": 131,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.81875,
+            "lo": 0.7294117647058823,
+            "hi": 0.9038461538461539
+          },
+          "resolved_pairs": {
+            "count": 123,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.76875,
+            "lo": 0.6776315789473685,
+            "hi": 0.8536585365853658
+          },
+          "clear_binary_flips": {
+            "count": 1,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.00625,
+            "lo": 0.0,
+            "hi": 0.01910828025477707
+          }
+        }
+      },
+      "transitions": {
+        "pass->unresolved": 106,
+        "unresolved->fail": 9,
+        "unresolved->pass": 41,
+        "fail->pass": 3,
+        "fail->unresolved": 6,
+        "pass->fail": 1
+      },
+      "issue_counts": {
+        "key_support_unresolved": 153,
+        "nonliteral_or_mislocated_answer_quote": 5,
+        "contradiction_unresolved": 9,
+        "coverage_unresolved": 9,
+        "nonliteral_source_quote": 36,
+        "invalid_response": 19
+      },
+      "valid_responses": 253,
+      "invalid_responses": 3
+    },
+    "google": {
+      "control_accuracy": {
+        "count": 187,
+        "total": 192,
+        "clusters": 8,
+        "value": 0.9739583333333334,
+        "lo": 0.9479166666666666,
+        "hi": 0.9947916666666666
+      },
+      "failure_recall": {
+        "count": 118,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.9833333333333333,
+        "lo": 0.95,
+        "hi": 1.0
+      },
+      "control_clear_coverage": {
+        "count": 188,
+        "total": 192,
+        "clusters": 8,
+        "value": 0.9791666666666666,
+        "lo": 0.9479166666666666,
+        "hi": 1.0
+      },
+      "critical_false_pass_rate": {
+        "count": 0,
+        "total": 120,
+        "clusters": 8,
+        "value": 0.0,
+        "lo": 0.0,
+        "hi": 0.0
+      },
+      "invariance": {
+        "identity_Anthropic": {
+          "agreement": {
+            "count": 123,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.76875,
+            "lo": 0.5620841595064993,
+            "hi": 0.9447852760736196
+          },
+          "resolved_pairs": {
+            "count": 123,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.76875,
+            "lo": 0.5620841595064993,
+            "hi": 0.9447852760736196
+          },
+          "clear_binary_flips": {
+            "count": 0,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.0,
+            "lo": 0.0,
+            "hi": 0.0
+          }
+        },
+        "identity_Google": {
+          "agreement": {
+            "count": 120,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.75,
+            "lo": 0.5485668202764977,
+            "hi": 0.9319759385235575
+          },
+          "resolved_pairs": {
+            "count": 121,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.75625,
+            "lo": 0.5534494571518921,
+            "hi": 0.9378892696508888
+          },
+          "clear_binary_flips": {
+            "count": 1,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.00625,
+            "lo": 0.0,
+            "hi": 0.019867549668874173
+          }
+        },
+        "identity_OpenAI": {
+          "agreement": {
+            "count": 142,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.8875,
+            "lo": 0.7245508982035929,
+            "hi": 1.0
+          },
+          "resolved_pairs": {
+            "count": 142,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.8875,
+            "lo": 0.7245508982035929,
+            "hi": 1.0
+          },
+          "clear_binary_flips": {
+            "count": 0,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.0,
+            "lo": 0.0,
+            "hi": 0.0
+          }
+        },
+        "reordered": {
+          "agreement": {
+            "count": 131,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.81875,
+            "lo": 0.6374981725146198,
+            "hi": 0.9736842105263158
+          },
+          "resolved_pairs": {
+            "count": 133,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.83125,
+            "lo": 0.6462511091393079,
+            "hi": 0.9929589776420762
+          },
+          "clear_binary_flips": {
+            "count": 2,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.0125,
+            "lo": 0.0,
+            "hi": 0.029585798816568046
+          }
+        },
+        "repeated": {
+          "agreement": {
+            "count": 141,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.88125,
+            "lo": 0.7364864864864865,
+            "hi": 0.9927020522585422
+          },
+          "resolved_pairs": {
+            "count": 145,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.90625,
+            "lo": 0.7612903225806451,
+            "hi": 1.0
+          },
+          "clear_binary_flips": {
+            "count": 4,
+            "total": 160,
+            "clusters": 20,
+            "value": 0.025,
+            "lo": 0.0,
+            "hi": 0.06587718602530027
+          }
+        }
+      },
+      "transitions": {
+        "pass->unresolved": 127,
+        "fail->unresolved": 9,
+        "fail->pass": 4,
+        "pass->fail": 3
+      },
+      "issue_counts": {
+        "nonliteral_source_quote": 7,
+        "invalid_response": 151,
+        "coverage_unresolved": 1,
+        "key_support_unresolved": 1
+      },
+      "valid_responses": 237,
+      "invalid_responses": 19
+    }
+  },
+  "real_consensus_resolution": {
+    "count": 197,
+    "total": 320,
+    "clusters": 20,
+    "value": 0.615625,
+    "lo": 0.49640021316280314,
+    "hi": 0.7222222222222222
+  },
+  "source_support": {
+    "count": 132,
+    "total": 160,
+    "clusters": 20,
+    "value": 0.825,
+    "lo": 0.7202321428571429,
+    "hi": 0.9119496855345912
+  },
+  "thresholds": {
+    "control_accuracy": 0.95,
+    "control_failure_recall": 0.95,
+    "critical_false_passes": 0,
+    "minimum_control_family_accuracy": 0.9,
+    "invariance": 0.98,
+    "source_supported_fraction": 0.9,
+    "real_resolution": 0.85
+  },
+  "bootstrap_replicates": 10000,
+  "bootstrap_seed": 310905,
+  "control_cluster": "family",
+  "real_cluster": "case",
+  "invalid_response_policy": "All its planned criteria remain unresolved; no partial JSON repair",
+  "ground_truth_accuracy_established": false,
+  "causal_identity_bias_established": false,
+  "unchanged_input_replicates": 0,
+  "human_review_required": false,
+  "usage_complete": true,
+  "conservative_usage_usd": "7.91006925",
+  "original_reservation_usd": "28.695514",
+  "budget_allowance_released": false,
+  "invoice_reconciled": false,
+  "new_provider_calls": 0,
+  "paid_retries": 0
+}
