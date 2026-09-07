@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "reference_qualification_failed",
+  "completed_on": "2026-09-06",
+  "expected_reviews": 72,
+  "completed_reviews": 72,
+  "accepted_reviews": 28,
+  "failed_reviews": 44,
+  "gate_failures": {
+    "reference_disagreement_or_ambiguity": 31,
+    "invalid_evidence_reference": 13
+  },
+  "diagnostic_counts": {
+    "answer_disagreement": 30,
+    "citation_mismatch": 28,
+    "ambiguity": 3,
+    "categories_overlap": true
+  },
+  "pilot_requests_submitted": 0,
+  "subject_requests_submitted": 0,
+  "ranking_eligible": false,
+  "prior_reservation_microusd": 76760474,
+  "qualification_reservation_microusd": 548862,
+  "cumulative_reservation_microusd": 77309336,
+  "reservation_is_verified_invoice": false,
+  "submission_ceiling_microusd": 90000000,
+  "absolute_cap_microusd": 100000000,
+  "automatic_retries": false
+}
