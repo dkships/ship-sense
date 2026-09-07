@@ -1,6 +1,7 @@
 """Scores stay visible while the failed semantic grading status stays truthful."""
 from copy import deepcopy
 import json
+from xml.etree import ElementTree
 
 import pytest
 
@@ -74,13 +75,47 @@ def test_charts_use_corrected_scores():
     field = release_page._standalone(release_page._field(ranked))
     assert (release_page.DOCS / 'field.svg').read_text() == field
     pairs = release_page.leaderboard._generation_pairs(models, previous, release_page._comparisons(scores))
-    chart = release_page._standalone(release_page.leaderboard._generations_svg(pairs))
+    chart = release_page._standalone(release_page._generation_svg(pairs))
     assert (release_page.DOCS / 'generations.svg').read_text() == chart
     assert release_page.readme_table(scores, previous) in (release_page.ROOT / 'README.md').read_text()
     assert len(pairs) == 14
     for pair in pairs:
         expected = pair['curr']['score']['value'] - pair['prev']['score']['value']
         assert pair['delta'] == pytest.approx(expected)
+
+
+def test_generation_labels_have_room():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    models = release_page.display_models(scores)
+    _, previous = release_page.leaderboard.split_generations(models)
+    pairs = release_page.leaderboard._generation_pairs(models, previous, release_page._comparisons(scores))
+    chart = ElementTree.fromstring(release_page._generation_svg(pairs))
+    for row in chart.findall('g'):
+        label_end = float(row.find("text[@class='flabel']").get('x'))
+        delta_start = float(row.find("text[@class='fnum']").get('x'))
+        for selector in ('fsprev', 'fscurr'):
+            score = row.find(f"text[@class='{selector}']")
+            x = float(score.get('x'))
+            width = len(score.text) * 8  # Conservative bound for 11.5px monospace.
+            left = x - width if score.get('text-anchor') == 'end' else x
+            right = left + width
+            assert left >= label_end + 8
+            assert right <= delta_start - 8
+
+
+def test_generation_verdicts_require_corrected_test():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    models = release_page.display_models(scores)
+    _, previous = release_page.leaderboard.split_generations(models)
+    pairs = release_page.leaderboard._generation_pairs(models, previous, release_page._comparisons(scores))
+    chart = ElementTree.fromstring(release_page._generation_svg(pairs))
+    for pair, row in zip(pairs, chart.findall('g'), strict=True):
+        verdict = ''.join(row.find("text[@class='fverd']").itertext())
+        if pair['decisive']:
+            assert ('Measured gain' if pair['winner'] == 'curr' else 'Measured loss') in verdict
+        else:
+            assert 'No detected difference' in verdict
+        assert 'slight' not in row.find('title').text
 
 
 def test_historical_honesty_does_not_set_primary_score():

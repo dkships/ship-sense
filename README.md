@@ -43,7 +43,7 @@ The [website](https://dkships.github.io/ship-sense/) also shows Honesty and the 
 
 ![Paired model generation comparisons](docs/generations.svg)
 
-Each arrow connects a predecessor to its tested successor. Paired differences include 95% intervals. Filled marks indicate a detected difference after Holm correction; hollow marks show an inconclusive direction. [View the comparison cards](https://dkships.github.io/ship-sense/#generations).
+Each arrow connects a predecessor to its tested successor. Paired differences include 95% intervals. Filled marks indicate a detected difference after Holm correction; a dot means no difference was detected. [View the comparison cards](https://dkships.github.io/ship-sense/#generations).
 
 <details>
 <summary>All 14 previous models</summary>
@@ -75,6 +75,7 @@ R/H/C are weighted correctness from 0 to 1, with 95% intervals. **H* is experime
 
 | Version | What changed |
 |---|---|
+| v3.5.2 | Fix generation-chart clipping and align verdicts with the corrected tests. |
 | v3.5.1 | Original scorecard restored; Decision scores recomputed from 39 corrected tasks. |
 | v3.5 | Source corrections and grading audit published; 59 tasks retained. |
 | [v3.0 and earlier](docs/history/v3.0/README.md) | Archived three-dimension scores and historical runs, before the grading audit. |

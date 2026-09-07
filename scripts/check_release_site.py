@@ -16,6 +16,42 @@ class QuietHandler(SimpleHTTPRequestHandler):
         pass
 
 
+def check_generation_chart(page, base, output, width):
+    response = page.goto(base + 'generations.svg', wait_until='networkidle')
+    assert response.status == 200
+    # Chromium cannot reliably capture a full-page standalone SVG document.
+    svg = page.locator('svg').evaluate('node => node.outerHTML')
+    page.goto('about:blank')
+    page.set_content('<!doctype html><html><body style="margin:0">' + svg + '</body></html>')
+    geometry = page.locator('svg').evaluate('''svg => {
+        const bounds = node => {
+            const box = node.getBBox();
+            return {left: box.x, right: box.x + box.width,
+                    top: box.y, bottom: box.y + box.height};
+        };
+        return {
+            view: {width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height},
+            texts: [...svg.querySelectorAll('text')].map(bounds),
+            rows: [...svg.querySelectorAll('.frow')].map(row => ({
+                label: bounds(row.querySelector('.flabel')),
+                delta: bounds(row.querySelector('.fnum')),
+                scores: [...row.querySelectorAll('.fsprev, .fscurr')].map(bounds)
+            }))
+        };
+    }''')
+    assert len(geometry['rows']) == 14
+    for text in geometry['texts']:
+        assert 0 <= text['left'] < text['right'] <= geometry['view']['width'], text
+        assert 0 <= text['top'] < text['bottom'] <= geometry['view']['height'], text
+    for row in geometry['rows']:
+        for score in row['scores']:
+            assert score['left'] >= row['label']['right'] + 8, row
+            assert score['right'] <= row['delta']['left'] - 8, row
+    assert 'slight upgrade' not in page.locator('svg').text_content()
+    page.screenshot(path=str(output / f'generations-{width}.png'), full_page=True)
+    return len(geometry['rows'])
+
+
 def check_page(page, base, output, width, height):
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -66,9 +102,11 @@ def check_page(page, base, output, width, height):
     assert page.get_by_text('Provisional results. No official ranking.').is_visible()
     assert page.locator('tbody tr').count() == 32
     assert not page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
+    generation_rows = check_generation_chart(page, base, output, width)
     assert not errors, errors
     return {'viewport': [width, height], 'console_errors': errors, 'overflow': False,
             'current_rows': 18, 'previous_rows': 14, 'generation_cards': 14,
+            'generation_chart_rows': generation_rows, 'generation_chart_labels': 'no overlap or clipping',
             'matrix_rows': 17, 'all_model_scores_match': True, 'historical_scores': 'passed'}
 
 
