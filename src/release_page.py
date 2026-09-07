@@ -4,6 +4,7 @@ from html import escape
 import json
 import math
 from pathlib import Path
+from xml.etree import ElementTree
 
 from . import candidate_page, decision_scores, leaderboard, stats
 
@@ -120,13 +121,17 @@ def _table(models, identifier):
 <th scope="col">Previous overall<small>experimental</small></th></tr></thead><tbody>{_score_rows(models)}</tbody></table></div>'''
 
 
+def _generation_verdict(pair):
+    if not pair['decisive']:
+        return 'No detected difference'
+    return 'Measured gain' if pair['winner'] == 'curr' else 'Measured loss'
+
+
 def _generation_cards(pairs):
     cards = []
     for pair in pairs:
         current, previous = pair['curr'], pair['prev']
-        verdict = 'No detected difference'
-        if pair['decisive']:
-            verdict = 'Measured gain' if pair['winner'] == 'curr' else 'Measured loss'
+        verdict = _generation_verdict(pair)
         rows = []
         for model, label in ((previous, 'Previous'), (current, 'Successor')):
             s = model['score']
@@ -145,6 +150,49 @@ def _generation_cards(pairs):
 
 def _field(ranked):
     return leaderboard._score_field_svg(ranked).replace('Ship Sense scores', 'Decision scores').replace(' · H ', ' · experimental H ')
+
+
+def _generation_svg(pairs):
+    """Reserve endpoint-label gutters without changing the sealed renderer."""
+    svg = leaderboard._generations_svg(pairs)
+    if not svg:
+        return svg
+    chart = ElementTree.fromstring(svg)
+    grid = [float(line.get('x1')) for line in chart.findall('line')]
+    left, right = min(grid), max(grid)
+    label_gutter = 44
+    scale = (right - left - 2 * label_gutter) / (right - left)
+
+    def sx(value):
+        return f'{left + label_gutter + (float(value) - left) * scale:.1f}'
+
+    for line in chart.iter('line'):
+        for attr in ('x1', 'x2'):
+            line.set(attr, sx(line.get(attr)))
+    for circle in chart.iter('circle'):
+        circle.set('cx', sx(circle.get('cx')))
+    for arrow in chart.iter('polygon'):
+        arrow.set('points', ' '.join(f'{sx(x)},{y}' for x, y in
+                                    (point.split(',') for point in arrow.get('points').split())))
+    for text in chart.iter('text'):
+        if text.get('class') in ('ftick', 'fsprev', 'fscurr'):
+            text.set('x', sx(text.get('x')))
+    rows = [pair for pair in pairs if pair['delta'] is not None]
+    for pair, row in zip(rows, chart.findall('g'), strict=True):
+        verdict = _generation_verdict(pair)
+        mark = row.find("text[@class='fverd']/tspan")
+        gain = pair['winner'] == 'curr'
+        mark.set('class', ('fwin' if gain else 'floss') if pair['decisive'] else 'fnone')
+        mark.text = ('▲' if gain else '▼') if pair['decisive'] else '·'
+        mark.tail = ' ' + verdict
+        endpoints = []
+        for model in (pair['prev'], pair['curr']):
+            score = model['score']
+            endpoints.append(f'{model["label"]} {score["value"]:.1f} [{score["lo"]:.1f}, {score["hi"]:.1f}]')
+        row.find('title').text = (' → '.join(endpoints) + f' · paired Δ {leaderboard._pair_delta_text(pair)}'
+                                 f' · {verdict} · Holm p {pair["holm_p"]:.3g}')
+    chart.set('aria-label', 'Decision scores from each predecessor to its successor, with paired 95% intervals and Holm-corrected results')
+    return ElementTree.tostring(chart, encoding='unicode')
 
 
 def _standalone(svg):
@@ -226,10 +274,11 @@ small{{display:block;font:inherit;margin-top:.25rem}} .experimental{{color:var(-
 <p><a href="https://github.com/dkships/ship-sense/blob/main/METHODOLOGY.md">Full methodology</a> · <a href="release.json">Release manifest</a> · <a href="https://github.com/dkships/ship-sense/blob/main/CORRECTIONS.md">Correction log</a></p></details></section>
 <section id="history"><h2>Score history</h2><p class="lead-in">Compare models within a scoring version. A change between versions can reflect a different task set or metric.</p>
 <div class="tablewrap"><table class="hist"><thead><tr><th>Version</th><th>Date</th><th>Models</th><th>What changed</th></tr></thead><tbody>
-<tr><td>{version}</td><td>{release['released_on']}</td><td>{scores['model_count']}</td><td>Original scorecard restored. Reproducible Decision scores from 39 corrected tasks; Honesty shown separately.</td></tr>
+<tr><td>{version}</td><td>{release['released_on']}</td><td>{scores['model_count']}</td><td>Generation-chart spacing and verdicts corrected. Scores unchanged.</td></tr>
+<tr><td>v3.5.1</td><td>2026-09-06</td><td>31</td><td>Original scorecard restored. Reproducible Decision scores from 39 corrected tasks; Honesty shown separately.</td></tr>
 <tr><td>v3.5</td><td>2026-09-06</td><td>31</td><td>Four source annotations and grading audit published. Full corrected bank: 59 tasks.</td></tr>
 <tr><td><a href="history/v3.0/docs/index.html">v3.0 archive</a></td><td>2026-07-10 base run</td><td>31</td><td>Original three-dimension board before the audit. Historical scores have known grading limitations.</td></tr></tbody></table></div></section>
-</main><footer><div class="wrap"><div class="foot-left"><div class="foot-brand">Ship Sense</div><p>Real product work. Documented scoring. Public calculations.<br>{version} · {scores['cases']} decision tasks · {scores['checks']} checks per run.</p></div><div class="foot-right">Built by <a href="https://dmkthinks.org/">David Kelly</a><br><a href="https://github.com/dkships/ship-sense">GitHub</a> · <a href="https://github.com/dkships/ship-sense/blob/main/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/dkships/ship-sense/blob/main/NEXT_VERSION.md">v4.0 drafts</a></div></div></footer>
+</main><footer><div class="wrap"><div class="foot-left"><div class="foot-brand">Ship Sense</div><p>Real product work. Documented scoring. Public calculations.<br>{version} · {scores['cases']} decision tasks · {scores['checks']} checks per run.</p></div><div class="foot-right">Built by <a href="https://dmkthinks.org/">David Kelly</a><br><a href="https://github.com/dkships/ship-sense">GitHub</a> · <a href="https://github.com/dkships/ship-sense/blob/main/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/dkships/ship-sense/blob/main/NEXT_VERSION.md">v4 plan and scoring</a></div></div></footer>
 </body></html>'''
 
 
@@ -266,7 +315,7 @@ def main():
     (DOCS / 'index.html').write_text(render(release, scores, candidate))
     (DOCS / 'card.svg').write_text(render_card(release))
     (DOCS / 'field.svg').write_text(_standalone(_field(leaderboard.rank_with_ties(current))))
-    (DOCS / 'generations.svg').write_text(_standalone(leaderboard._generations_svg(pairs)))
+    (DOCS / 'generations.svg').write_text(_standalone(_generation_svg(pairs)))
     path = ROOT / 'README.md'
     text = path.read_text()
     for marker, rows in (('scores', current), ('previous', previous)):
