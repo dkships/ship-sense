@@ -220,7 +220,7 @@ def prepare(tasks_path, plan_path, pack):
                 raise ValueError("Complete qualification and subject reservation exceeds the shared $90 ceiling")
             files = {p for p in pack.rglob("*") if p.is_file()}
             files.update(ROOT / "src" / (name + ".py") for name in SOURCE_FILES)
-            files.update((tasks_path, plan_path, ROOT / "docs/decision-inputs.json"))
+            files.update((tasks_path, plan_path, ROOT / "docs/history/v3.5/decision-inputs.json"))
             files.update(path for name in ("prices.json", "verification.json", "batch-capabilities.json")
                          if (path := plan_path.parent / name).exists())
             if document.get("source_review"):
@@ -519,7 +519,7 @@ def score(pack):
         result = scoring.summarize(document, responses, plan["roster"])
         if not all(model["eligible"] for model in result["inputs"]["models"]):
             raise ValueError("Every planned subject must have complete eligible responses")
-        combined = scoring.combine(read(ROOT / "docs/decision-inputs.json"), result["inputs"])
+        combined = scoring.combine(read(ROOT / "docs/history/v3.5/decision-inputs.json"), result["inputs"])
         for name, value in (("workflow-inputs", result["inputs"]), ("workflow-scores", result["scores"]), ("v4-scores", combined)):
             path = pack / (name + ".json")
             if path.exists():

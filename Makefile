@@ -2,6 +2,7 @@
 # Paid inference requires native batches and the existing spending controls.
 PY := .venv/bin/python
 RUN_ID ?= $(shell date +%F)
+WORKERS ?= 4
 # Select the exact roster explicitly for paid runs and publication checks.
 # A registry entry is a catalog record, not authorization to rerun that model.
 MODELS ?=
@@ -34,9 +35,19 @@ sample:
 	$(PY) -m src.run --models mock-strong mock-weak mock-naive --run-id sample --only-examples
 	$(PY) -m src.report --run-id sample
 
-# Retain explicit errors for old commands rather than silently changing their cost.
-live refresh:
-	@echo 'Disabled: all paid inference must use native batch APIs and the existing spending controls.' >&2
+# Live lane for vendors with no usable batch route (xAI, Meta, Moonshot, Qwen,
+# DeepSeek, Z.ai) — shipped defaults, gated by notes/gate_run.py before any merge.
+# Scoped like batch-prepare: the synthetic example_* items never reach the
+# leaderboard, so a paid run must not pay for them.
+live: require-models
+	./scripts/with_env.sh $(PY) -m src.run --models $(MODELS) --run-id $(RUN_ID) --workers $(WORKERS) --run-mode live --case-scope official_real_only && \
+	$(PY) -m src.report --run-id $(RUN_ID)
+	@echo "Done -> outputs/$(RUN_ID)/scorecard.md + leaderboard.png + audit.csv"
+
+# The retired refresh command stays an explicit error: re-running a published
+# model resamples its answers. Add a model under its own RUN_ID instead.
+refresh:
+	@echo 'Disabled: re-running a published model resamples its answers; add a model with its own RUN_ID instead.' >&2
 	@exit 2
 
 # Lowest-cost official run path. Writes provider-native JSONL for the next
