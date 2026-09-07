@@ -19,6 +19,10 @@ class QuietHandler(SimpleHTTPRequestHandler):
 def check_generation_chart(page, base, output, width):
     response = page.goto(base + 'generations.svg', wait_until='networkidle')
     assert response.status == 200
+    # Chromium cannot reliably capture a full-page standalone SVG document.
+    svg = page.locator('svg').evaluate('node => node.outerHTML')
+    page.goto('about:blank')
+    page.set_content('<!doctype html><html><body style="margin:0">' + svg + '</body></html>')
     geometry = page.locator('svg').evaluate('''svg => {
         const bounds = node => {
             const box = node.getBBox();
