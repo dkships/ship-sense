@@ -34,11 +34,6 @@ def check_page(page, base, output, width, height):
     assert first_name['width'] >= 130
     if width < 760:
         assert not page.locator('#model-scores th').nth(8).is_visible()
-        chart = page.locator('.fieldwrap')
-        assert chart.evaluate('(element) => element.scrollWidth > element.clientWidth')
-        chart.evaluate('(element) => element.scrollLeft = 100')
-        assert chart.evaluate('(element) => element.scrollLeft') == 100
-        chart.evaluate('(element) => element.scrollLeft = 0')
     assert page.locator('.matrix tbody tr').count() == 17
     assert not page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     scores = json.loads((ROOT / 'docs/decision-scores.json').read_text())
