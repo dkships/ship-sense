@@ -1,4 +1,4 @@
-"""Evidence publication must preserve the failed ranking gate and frozen scores."""
+"""Scores stay visible while the failed semantic grading status stays truthful."""
 from copy import deepcopy
 import json
 
@@ -38,9 +38,57 @@ def test_altered_data_is_blocked():
         release_page.validate(data)
 
 
-def test_release_has_no_winner():
+def test_scores_visible_without_certifying_honesty():
     page = release_page.render(release())
-    assert 'No validated model ranking' in page
-    assert 'Both model-grading screens failed' in page
+    assert 'Decision score = ½ Restraint + ½ Conviction' in page
+    assert 'Honesty failed semantic validation' in page
+    assert page.count('<tr data-model=') == 31
+    assert 'id="previous-scores"' in page
+    assert 'class="hero"' in page
+    assert 'class="gcards"' in page
+    assert 'class="matrix"' in page
+    assert 'experimental' in page
     assert 'candidate.html' in page
-    assert 'No model has answered' in page or 'no model has answered' in page
+
+
+def test_scores_in_readme_match_generated_data():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    text = (release_page.ROOT / 'README.md').read_text()
+    assert release_page.readme_table(scores) in text
+
+
+def test_display_escapes_model_text():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    scores['models'][0]['label'] = '<script>alert(1)</script>'
+    page = release_page.render(release(), scores=scores)
+    assert '<script>alert(1)</script>' not in page
+    assert '&lt;script&gt;alert(1)&lt;/script&gt;' in page
+
+
+def test_charts_use_corrected_scores():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    models = release_page.display_models(scores)
+    current, previous = release_page.leaderboard.split_generations(models)
+    ranked = release_page.leaderboard.rank_with_ties(current)
+    assert len(ranked) == 17 and len(previous) == 14
+    field = release_page._standalone(release_page._field(ranked))
+    assert (release_page.DOCS / 'field.svg').read_text() == field
+    pairs = release_page.leaderboard._generation_pairs(models, previous, release_page._comparisons(scores))
+    chart = release_page._standalone(release_page.leaderboard._generations_svg(pairs))
+    assert (release_page.DOCS / 'generations.svg').read_text() == chart
+    assert release_page.readme_table(scores, previous) in (release_page.ROOT / 'README.md').read_text()
+    assert len(pairs) == 14
+    for pair in pairs:
+        expected = pair['curr']['score']['value'] - pair['prev']['score']['value']
+        assert pair['delta'] == pytest.approx(expected)
+
+
+def test_historical_honesty_does_not_set_primary_score():
+    scores = json.loads((release_page.DOCS / 'decision-scores.json').read_text())
+    candidate = json.loads((release_page.DOCS / 'candidate.json').read_text())
+    before = release_page.display_models(scores, candidate)
+    for model in candidate['models']:
+        model['scenarios']['candidate']['dimensions']['honesty']['value'] = 0
+        model['scenarios']['candidate']['score']['value'] = 0
+    after = release_page.display_models(scores, candidate)
+    assert [m['score'] for m in before] == [m['score'] for m in after]
