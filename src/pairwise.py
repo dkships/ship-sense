@@ -20,6 +20,7 @@ Reads saved scores only. No API spend, no grading.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import itertools
 from pathlib import Path
 
@@ -85,14 +86,17 @@ def compare(per_model: dict[str, list[dict]], models: list[str],
     pair in this call; otherwise the pair is reported as no detected difference.
     """
     out = []
-    permutations = n if permutations is None else permutations
+    rosters = [Counter((r["item"], r["dimension"], r["sub"], float(r["weight"]))
+                       for r in per_model[name]) for name in models]
+    if rosters and any(roster != rosters[0] for roster in rosters[1:]):
+        raise ValueError("pairwise inference requires identical checks, weights, and generation coverage")
     for a, b in itertools.combinations(models, 2):
         res = stats.paired_bootstrap(per_model[a], per_model[b], n=n, seed=seed)
-        p_value = stats.paired_signflip_p(per_model[a], per_model[b],
-                                          n=permutations, seed=seed)
+        p_value = stats.paired_exact_p(per_model[a], per_model[b])
         lo, hi = res["ci"]
         out.append({"a": a, "b": b, "diff": res["diff"], "lo": lo, "hi": hi,
-                    "n_items": res["n_items"], "p_value": p_value})
+                    "n_items": res["n_items"], "p_value": p_value,
+                    "test": "exact_item_signflip_v1"})
     adjusted = holm_adjust([r["p_value"] for r in out])
     for r, p_adj in zip(out, adjusted):
         r["p_adjusted"] = p_adj
@@ -136,7 +140,7 @@ def render(scores: dict[str, tuple], models: list[str], records: list[dict],
         f"({scope}) · {len(records)} comparisons.", "",
         "The paired estimate uses the same equal weight per dimension as the "
         "headline score. Its 95% bootstrap interval resamples whole items within "
-        "each dimension. The two-sided sign-flip test swaps model labels by item, "
+        "each dimension. The exact two-sided sign-flip test swaps model labels by item, "
         "then Holm-corrects across this full comparison family. A win is reported "
         "only when the adjusted p-value is at most 0.05.", "",
         "The intervals are unadjusted estimates, so an interval can exclude zero "
@@ -151,7 +155,7 @@ def render(scores: dict[str, tuple], models: list[str], records: list[dict],
               "| A | B | Δ (A−B) | 95% CI | Holm p | items | verdict |",
               "|---|---|---|---|---|---|---|"]
     for r in records:
-        verdict = "no difference" if r["winner"] is None else f"**{r['winner']}** wins"
+        verdict = "no detected difference" if r["winner"] is None else f"**{r['winner']}** wins"
         lines.append(f"| {r['a']} | {r['b']} | {r['diff']:+.3f} | "
                      f"[{r['lo']:+.3f}, {r['hi']:+.3f}] | {r['p_adjusted']:.4f} | "
                      f"{r['n_items']} | {verdict} |")
@@ -172,9 +176,8 @@ def main():
     ap.add_argument("--all-pairs", action="store_true",
                     help="Compare every ranked model, not just the band.")
     ap.add_argument("--n", type=int, default=10000, help="Bootstrap resamples per pair.")
-    ap.add_argument("--permutations", type=int, default=100000,
-                    help="Sign-flip draws per pair (default 100000; more precision is "
-                         "needed before Holm correction across a large family).")
+    ap.add_argument("--permutations", type=int, default=None,
+                    help="Deprecated compatibility option; p-values are now exact.")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 

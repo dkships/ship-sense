@@ -18,6 +18,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
+import tempfile
 
 from . import grade, leaderboard, loader
 
@@ -49,21 +51,52 @@ def regrade(run_id: str) -> dict[str, list[dict]]:
             continue
         per_model.setdefault(name, []).extend(graded)
 
-    scores_dir = run_dir / "scores"
-    scores_dir.mkdir(parents=True, exist_ok=True)
-    for name, results in per_model.items():
-        (scores_dir / f"{name}.json").write_text(json.dumps(results, indent=2))
     # A regrade intentionally binds rewritten scores to the current keys. Record
     # each complete current scope represented in the saved raw roster.
     raw_ids = {p.stem.partition("__")[2] for p in raw_dir.glob("*.json")}
-    for scope in loader.CASE_SCOPES:
-        scoped_items = loader.load_cases(case_scope=scope)
-        if scoped_items and {item["id"] for item in scoped_items} <= raw_ids:
-            leaderboard.write_run_bank_manifest(run_id, scoped_items, scope,
-                                                 replace=True)
+    with tempfile.TemporaryDirectory(prefix=".regrade-", dir=run_dir.parent) as temporary:
+        staged = Path(temporary)
+        bank = run_dir / "bank.json"
+        if bank.exists():
+            shutil.copy2(bank, staged / "bank.json")
+        for scope in loader.CASE_SCOPES:
+            scoped_items = loader.load_cases(case_scope=scope)
+            if scoped_items and {item["id"] for item in scoped_items} <= raw_ids:
+                leaderboard.write_run_bank_manifest(staged.name, scoped_items, scope,
+                                                     replace=True)
+        (staged / "scores").mkdir()
+        for name, results in per_model.items():
+            (staged / "scores" / f"{name}.json").write_text(json.dumps(results, indent=2))
+        _install_regrade(run_dir, staged)
     if skipped:
         print(f"  ! {len(skipped)} raw file(s) skipped (unparseable or not in bank)")
     return per_model
+
+
+def _install_regrade(run_dir: Path, staged: Path) -> None:
+    """Install only after every manifest guard passes; roll back write failures."""
+    scores = run_dir / "scores"
+    backup = staged / "previous-scores"
+    bank = run_dir / "bank.json"
+    old_bank = bank.read_bytes() if bank.exists() else None
+    installed = False
+    try:
+        if scores.exists():
+            scores.rename(backup)
+        (staged / "scores").rename(scores)
+        installed = True
+        if (staged / "bank.json").exists():
+            (staged / "bank.json").replace(bank)
+    except Exception:
+        if installed:
+            shutil.rmtree(scores)
+        if backup.exists():
+            backup.rename(scores)
+        if old_bank is not None:
+            bank.write_bytes(old_bank)
+        else:
+            bank.unlink(missing_ok=True)
+        raise
 
 
 def main():

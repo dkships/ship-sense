@@ -74,3 +74,9 @@ def test_render_explains_multiplicity_control_and_the_verdicts():
     assert "Holm p" in md
     assert "**a** wins" in md
     assert "beats 1 of 1" in md
+
+
+def test_compare_rejects_different_generation_coverage():
+    per = {"a": _model([1, 0]) * 2, "b": _model([1, 0])}
+    with pytest.raises(ValueError, match="identical checks"):
+        pairwise.compare(per, ["a", "b"])
