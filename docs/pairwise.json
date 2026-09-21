@@ -101,6 +101,16 @@
  },
  {
   "a": "muse-spark-1.1",
+  "b": "grok-4.7",
+  "delta": 0.042,
+  "lo": 0.01,
+  "hi": 0.077,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "muse-spark-1.1",
   "b": "gpt-5.6-terra",
   "delta": 0.046,
   "lo": 0.013,
@@ -115,7 +125,7 @@
   "delta": 0.064,
   "lo": 0.027,
   "hi": 0.103,
-  "holm_p": 0.778,
+  "holm_p": 0.8443,
   "n_items": 67,
   "winner": null
  },
@@ -125,7 +135,7 @@
   "delta": 0.069,
   "lo": 0.037,
   "hi": 0.101,
-  "holm_p": 0.0257,
+  "holm_p": 0.0278,
   "n_items": 67,
   "winner": "muse-spark-1.1"
  },
@@ -175,7 +185,7 @@
   "delta": 0.084,
   "lo": 0.049,
   "hi": 0.122,
-  "holm_p": 0.0073,
+  "holm_p": 0.0078,
   "n_items": 67,
   "winner": "muse-spark-1.1"
  },
@@ -185,7 +195,7 @@
   "delta": 0.085,
   "lo": 0.045,
   "hi": 0.125,
-  "holm_p": 0.1642,
+  "holm_p": 0.1781,
   "n_items": 67,
   "winner": null
  },
@@ -195,7 +205,7 @@
   "delta": 0.088,
   "lo": 0.05,
   "hi": 0.132,
-  "holm_p": 0.002,
+  "holm_p": 0.0022,
   "n_items": 67,
   "winner": "muse-spark-1.1"
  },
@@ -205,7 +215,7 @@
   "delta": 0.089,
   "lo": 0.055,
   "hi": 0.127,
-  "holm_p": 0.0007,
+  "holm_p": 0.0008,
   "n_items": 67,
   "winner": "muse-spark-1.1"
  },
@@ -265,7 +275,7 @@
   "delta": 0.114,
   "lo": 0.064,
   "hi": 0.165,
-  "holm_p": 0.0886,
+  "holm_p": 0.096,
   "n_items": 67,
   "winner": null
  },
@@ -275,7 +285,7 @@
   "delta": 0.12,
   "lo": 0.075,
   "hi": 0.167,
-  "holm_p": 0.0024,
+  "holm_p": 0.0026,
   "n_items": 67,
   "winner": "muse-spark-1.1"
  },
@@ -391,6 +401,16 @@
  },
  {
   "a": "muse-spark-1.2",
+  "b": "grok-4.7",
+  "delta": 0.041,
+  "lo": 0.008,
+  "hi": 0.076,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "muse-spark-1.2",
   "b": "gpt-5.6-terra",
   "delta": 0.045,
   "lo": 0.014,
@@ -405,7 +425,7 @@
   "delta": 0.063,
   "lo": 0.026,
   "hi": 0.102,
-  "holm_p": 0.7291,
+  "holm_p": 0.7909,
   "n_items": 67,
   "winner": null
  },
@@ -415,7 +435,7 @@
   "delta": 0.068,
   "lo": 0.035,
   "hi": 0.1,
-  "holm_p": 0.0356,
+  "holm_p": 0.0385,
   "n_items": 67,
   "winner": "muse-spark-1.2"
  },
@@ -465,7 +485,7 @@
   "delta": 0.083,
   "lo": 0.046,
   "hi": 0.122,
-  "holm_p": 0.0132,
+  "holm_p": 0.0142,
   "n_items": 67,
   "winner": "muse-spark-1.2"
  },
@@ -475,7 +495,7 @@
   "delta": 0.084,
   "lo": 0.044,
   "hi": 0.123,
-  "holm_p": 0.138,
+  "holm_p": 0.1496,
   "n_items": 67,
   "winner": null
  },
@@ -485,7 +505,7 @@
   "delta": 0.087,
   "lo": 0.049,
   "hi": 0.132,
-  "holm_p": 0.0045,
+  "holm_p": 0.0048,
   "n_items": 67,
   "winner": "muse-spark-1.2"
  },
@@ -555,7 +575,7 @@
   "delta": 0.113,
   "lo": 0.064,
   "hi": 0.163,
-  "holm_p": 0.0438,
+  "holm_p": 0.0473,
   "n_items": 67,
   "winner": "muse-spark-1.2"
  },
@@ -565,7 +585,7 @@
   "delta": 0.119,
   "lo": 0.072,
   "hi": 0.168,
-  "holm_p": 0.0061,
+  "holm_p": 0.0065,
   "n_items": 67,
   "winner": "muse-spark-1.2"
  },
@@ -671,6 +691,16 @@
  },
  {
   "a": "muse-spark-1.3",
+  "b": "grok-4.7",
+  "delta": 0.033,
+  "lo": 0.002,
+  "hi": 0.067,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "muse-spark-1.3",
   "b": "gpt-5.6-terra",
   "delta": 0.038,
   "lo": 0.006,
@@ -695,7 +725,7 @@
   "delta": 0.061,
   "lo": 0.03,
   "hi": 0.092,
-  "holm_p": 0.3142,
+  "holm_p": 0.3413,
   "n_items": 67,
   "winner": null
  },
@@ -745,7 +775,7 @@
   "delta": 0.075,
   "lo": 0.04,
   "hi": 0.114,
-  "holm_p": 0.0163,
+  "holm_p": 0.0175,
   "n_items": 67,
   "winner": "muse-spark-1.3"
  },
@@ -755,7 +785,7 @@
   "delta": 0.076,
   "lo": 0.04,
   "hi": 0.114,
-  "holm_p": 0.2955,
+  "holm_p": 0.3217,
   "n_items": 67,
   "winner": null
  },
@@ -765,7 +795,7 @@
   "delta": 0.079,
   "lo": 0.044,
   "hi": 0.123,
-  "holm_p": 0.0026,
+  "holm_p": 0.0028,
   "n_items": 67,
   "winner": "muse-spark-1.3"
  },
@@ -835,7 +865,7 @@
   "delta": 0.106,
   "lo": 0.055,
   "hi": 0.157,
-  "holm_p": 0.4236,
+  "holm_p": 0.4607,
   "n_items": 67,
   "winner": null
  },
@@ -845,7 +875,7 @@
   "delta": 0.112,
   "lo": 0.067,
   "hi": 0.159,
-  "holm_p": 0.022,
+  "holm_p": 0.0237,
   "n_items": 67,
   "winner": "muse-spark-1.3"
  },
@@ -941,6 +971,16 @@
  },
  {
   "a": "claude-fable-5-1",
+  "b": "grok-4.7",
+  "delta": 0.032,
+  "lo": -0.013,
+  "hi": 0.075,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "claude-fable-5-1",
   "b": "gpt-5.6-terra",
   "delta": 0.036,
   "lo": -0.006,
@@ -965,7 +1005,7 @@
   "delta": 0.059,
   "lo": 0.023,
   "hi": 0.094,
-  "holm_p": 0.4774,
+  "holm_p": 0.5182,
   "n_items": 67,
   "winner": null
  },
@@ -1015,7 +1055,7 @@
   "delta": 0.073,
   "lo": 0.042,
   "hi": 0.106,
-  "holm_p": 0.0151,
+  "holm_p": 0.0162,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1025,7 +1065,7 @@
   "delta": 0.074,
   "lo": 0.025,
   "hi": 0.12,
-  "holm_p": 0.7371,
+  "holm_p": 0.7997,
   "n_items": 67,
   "winner": null
  },
@@ -1035,7 +1075,7 @@
   "delta": 0.077,
   "lo": 0.049,
   "hi": 0.107,
-  "holm_p": 0.006,
+  "holm_p": 0.0064,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1045,7 +1085,7 @@
   "delta": 0.079,
   "lo": 0.049,
   "hi": 0.112,
-  "holm_p": 0.0039,
+  "holm_p": 0.0041,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1075,7 +1115,7 @@
   "delta": 0.094,
   "lo": 0.047,
   "hi": 0.136,
-  "holm_p": 0.0153,
+  "holm_p": 0.0164,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1085,7 +1125,7 @@
   "delta": 0.094,
   "lo": 0.053,
   "hi": 0.132,
-  "holm_p": 0.0075,
+  "holm_p": 0.008,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1095,7 +1135,7 @@
   "delta": 0.103,
   "lo": 0.054,
   "hi": 0.15,
-  "holm_p": 0.0159,
+  "holm_p": 0.0171,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1105,7 +1145,7 @@
   "delta": 0.104,
   "lo": 0.059,
   "hi": 0.153,
-  "holm_p": 0.0054,
+  "holm_p": 0.0058,
   "n_items": 67,
   "winner": "claude-fable-5-1"
  },
@@ -1115,7 +1155,7 @@
   "delta": 0.11,
   "lo": 0.052,
   "hi": 0.165,
-  "holm_p": 0.0817,
+  "holm_p": 0.0884,
   "n_items": 67,
   "winner": null
  },
@@ -1201,6 +1241,16 @@
  },
  {
   "a": "gpt-5.5",
+  "b": "grok-4.7",
+  "delta": 0.028,
+  "lo": -0.012,
+  "hi": 0.069,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "gpt-5.5",
   "b": "gpt-5.6-terra",
   "delta": 0.033,
   "lo": 0.004,
@@ -1225,7 +1275,7 @@
   "delta": 0.055,
   "lo": 0.025,
   "hi": 0.086,
-  "holm_p": 0.1756,
+  "holm_p": 0.1907,
   "n_items": 67,
   "winner": null
  },
@@ -1275,7 +1325,7 @@
   "delta": 0.07,
   "lo": 0.041,
   "hi": 0.1,
-  "holm_p": 0.0068,
+  "holm_p": 0.0073,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1285,7 +1335,7 @@
   "delta": 0.071,
   "lo": 0.033,
   "hi": 0.11,
-  "holm_p": 0.3142,
+  "holm_p": 0.3413,
   "n_items": 67,
   "winner": null
  },
@@ -1295,7 +1345,7 @@
   "delta": 0.074,
   "lo": 0.034,
   "hi": 0.116,
-  "holm_p": 0.1664,
+  "holm_p": 0.1806,
   "n_items": 67,
   "winner": null
  },
@@ -1305,7 +1355,7 @@
   "delta": 0.075,
   "lo": 0.045,
   "hi": 0.109,
-  "holm_p": 0.004,
+  "holm_p": 0.0043,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1315,7 +1365,7 @@
   "delta": 0.077,
   "lo": 0.042,
   "hi": 0.114,
-  "holm_p": 0.0142,
+  "holm_p": 0.0153,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1325,7 +1375,7 @@
   "delta": 0.087,
   "lo": 0.051,
   "hi": 0.122,
-  "holm_p": 0.0023,
+  "holm_p": 0.0025,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1345,7 +1395,7 @@
   "delta": 0.09,
   "lo": 0.053,
   "hi": 0.126,
-  "holm_p": 0.0042,
+  "holm_p": 0.0045,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1355,7 +1405,7 @@
   "delta": 0.1,
   "lo": 0.062,
   "hi": 0.137,
-  "holm_p": 0.0007,
+  "holm_p": 0.0008,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1365,7 +1415,7 @@
   "delta": 0.1,
   "lo": 0.047,
   "hi": 0.153,
-  "holm_p": 0.2792,
+  "holm_p": 0.3038,
   "n_items": 67,
   "winner": null
  },
@@ -1375,7 +1425,7 @@
   "delta": 0.106,
   "lo": 0.063,
   "hi": 0.152,
-  "holm_p": 0.0022,
+  "holm_p": 0.0023,
   "n_items": 67,
   "winner": "gpt-5.5"
  },
@@ -1445,6 +1495,16 @@
   "delta": 0.016,
   "lo": -0.029,
   "hi": 0.059,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "claude-fable-5",
+  "b": "grok-4.7",
+  "delta": 0.023,
+  "lo": -0.022,
+  "hi": 0.068,
   "holm_p": 1.0,
   "n_items": 67,
   "winner": null
@@ -1525,7 +1585,7 @@
   "delta": 0.065,
   "lo": 0.038,
   "hi": 0.094,
-  "holm_p": 0.0213,
+  "holm_p": 0.023,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1545,7 +1605,7 @@
   "delta": 0.069,
   "lo": 0.042,
   "hi": 0.098,
-  "holm_p": 0.026,
+  "holm_p": 0.0281,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1555,7 +1615,7 @@
   "delta": 0.071,
   "lo": 0.043,
   "hi": 0.1,
-  "holm_p": 0.0103,
+  "holm_p": 0.0111,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1565,7 +1625,7 @@
   "delta": 0.072,
   "lo": 0.046,
   "hi": 0.101,
-  "holm_p": 0.0039,
+  "holm_p": 0.0042,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1575,7 +1635,7 @@
   "delta": 0.082,
   "lo": 0.055,
   "hi": 0.113,
-  "holm_p": 0.0004,
+  "holm_p": 0.0005,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1585,7 +1645,7 @@
   "delta": 0.086,
   "lo": 0.04,
   "hi": 0.126,
-  "holm_p": 0.0444,
+  "holm_p": 0.0479,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1595,7 +1655,7 @@
   "delta": 0.086,
   "lo": 0.041,
   "hi": 0.129,
-  "holm_p": 0.1479,
+  "holm_p": 0.1604,
   "n_items": 67,
   "winner": null
  },
@@ -1605,7 +1665,7 @@
   "delta": 0.095,
   "lo": 0.047,
   "hi": 0.14,
-  "holm_p": 0.0389,
+  "holm_p": 0.042,
   "n_items": 67,
   "winner": "claude-fable-5"
  },
@@ -1615,7 +1675,7 @@
   "delta": 0.096,
   "lo": 0.046,
   "hi": 0.147,
-  "holm_p": 0.1664,
+  "holm_p": 0.1806,
   "n_items": 67,
   "winner": null
  },
@@ -1625,7 +1685,7 @@
   "delta": 0.101,
   "lo": 0.045,
   "hi": 0.156,
-  "holm_p": 0.1732,
+  "holm_p": 0.1881,
   "n_items": 67,
   "winner": null
  },
@@ -1691,6 +1751,16 @@
  },
  {
   "a": "grok-4.5",
+  "b": "grok-4.7",
+  "delta": 0.02,
+  "lo": -0.01,
+  "hi": 0.055,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.5",
   "b": "gpt-5.6-terra",
   "delta": 0.025,
   "lo": -0.011,
@@ -1715,7 +1785,7 @@
   "delta": 0.047,
   "lo": 0.021,
   "hi": 0.075,
-  "holm_p": 0.4533,
+  "holm_p": 0.4917,
   "n_items": 67,
   "winner": null
  },
@@ -1785,7 +1855,7 @@
   "delta": 0.066,
   "lo": 0.03,
   "hi": 0.11,
-  "holm_p": 0.1988,
+  "holm_p": 0.216,
   "n_items": 67,
   "winner": null
  },
@@ -1795,7 +1865,7 @@
   "delta": 0.067,
   "lo": 0.032,
   "hi": 0.108,
-  "holm_p": 0.1288,
+  "holm_p": 0.1396,
   "n_items": 67,
   "winner": null
  },
@@ -1805,7 +1875,7 @@
   "delta": 0.069,
   "lo": 0.035,
   "hi": 0.109,
-  "holm_p": 0.0317,
+  "holm_p": 0.0342,
   "n_items": 67,
   "winner": "grok-4.5"
  },
@@ -1815,7 +1885,7 @@
   "delta": 0.079,
   "lo": 0.044,
   "hi": 0.118,
-  "holm_p": 0.0138,
+  "holm_p": 0.0148,
   "n_items": 67,
   "winner": "grok-4.5"
  },
@@ -1825,7 +1895,7 @@
   "delta": 0.082,
   "lo": 0.05,
   "hi": 0.116,
-  "holm_p": 0.0024,
+  "holm_p": 0.0026,
   "n_items": 67,
   "winner": "grok-4.5"
  },
@@ -1845,7 +1915,7 @@
   "delta": 0.092,
   "lo": 0.053,
   "hi": 0.131,
-  "holm_p": 0.0053,
+  "holm_p": 0.0057,
   "n_items": 67,
   "winner": "grok-4.5"
  },
@@ -1855,7 +1925,7 @@
   "delta": 0.092,
   "lo": 0.044,
   "hi": 0.141,
-  "holm_p": 0.6559,
+  "holm_p": 0.7105,
   "n_items": 67,
   "winner": null
  },
@@ -1865,7 +1935,7 @@
   "delta": 0.098,
   "lo": 0.051,
   "hi": 0.147,
-  "holm_p": 0.1499,
+  "holm_p": 0.1626,
   "n_items": 67,
   "winner": null
  },
@@ -1915,6 +1985,16 @@
   "delta": 0.011,
   "lo": -0.011,
   "hi": 0.035,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "gpt-5.6-sol",
+  "b": "grok-4.7",
+  "delta": 0.019,
+  "lo": -0.016,
+  "hi": 0.057,
   "holm_p": 1.0,
   "n_items": 67,
   "winner": null
@@ -1995,7 +2075,7 @@
   "delta": 0.061,
   "lo": 0.029,
   "hi": 0.097,
-  "holm_p": 0.0507,
+  "holm_p": 0.0548,
   "n_items": 67,
   "winner": null
  },
@@ -2005,7 +2085,7 @@
   "delta": 0.062,
   "lo": 0.027,
   "hi": 0.1,
-  "holm_p": 0.9793,
+  "holm_p": 1.0,
   "n_items": 67,
   "winner": null
  },
@@ -2015,7 +2095,7 @@
   "delta": 0.065,
   "lo": 0.025,
   "hi": 0.112,
-  "holm_p": 0.5402,
+  "holm_p": 0.585,
   "n_items": 67,
   "winner": null
  },
@@ -2025,7 +2105,7 @@
   "delta": 0.066,
   "lo": 0.035,
   "hi": 0.104,
-  "holm_p": 0.0196,
+  "holm_p": 0.0211,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2035,7 +2115,7 @@
   "delta": 0.068,
   "lo": 0.034,
   "hi": 0.108,
-  "holm_p": 0.0233,
+  "holm_p": 0.0251,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2045,7 +2125,7 @@
   "delta": 0.078,
   "lo": 0.046,
   "hi": 0.114,
-  "holm_p": 0.0018,
+  "holm_p": 0.0019,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2055,7 +2135,7 @@
   "delta": 0.081,
   "lo": 0.048,
   "hi": 0.116,
-  "holm_p": 0.0116,
+  "holm_p": 0.0125,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2065,7 +2145,7 @@
   "delta": 0.081,
   "lo": 0.045,
   "hi": 0.118,
-  "holm_p": 0.0259,
+  "holm_p": 0.0279,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2075,7 +2155,7 @@
   "delta": 0.091,
   "lo": 0.054,
   "hi": 0.128,
-  "holm_p": 0.0036,
+  "holm_p": 0.0038,
   "n_items": 67,
   "winner": "gpt-5.6-sol"
  },
@@ -2095,7 +2175,7 @@
   "delta": 0.097,
   "lo": 0.053,
   "hi": 0.144,
-  "holm_p": 0.0792,
+  "holm_p": 0.0857,
   "n_items": 67,
   "winner": null
  },
@@ -2135,6 +2215,16 @@
   "delta": 0.009,
   "lo": -0.028,
   "hi": 0.049,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "gpt-6-astra",
+  "b": "grok-4.7",
+  "delta": 0.016,
+  "lo": -0.02,
+  "hi": 0.056,
   "holm_p": 1.0,
   "n_items": 67,
   "winner": null
@@ -2245,7 +2335,7 @@
   "delta": 0.064,
   "lo": 0.025,
   "hi": 0.105,
-  "holm_p": 0.6254,
+  "holm_p": 0.6774,
   "n_items": 67,
   "winner": null
  },
@@ -2255,7 +2345,7 @@
   "delta": 0.065,
   "lo": 0.028,
   "hi": 0.109,
-  "holm_p": 0.2966,
+  "holm_p": 0.3229,
   "n_items": 67,
   "winner": null
  },
@@ -2265,7 +2355,7 @@
   "delta": 0.075,
   "lo": 0.037,
   "hi": 0.114,
-  "holm_p": 0.0792,
+  "holm_p": 0.0857,
   "n_items": 67,
   "winner": null
  },
@@ -2275,7 +2365,7 @@
   "delta": 0.079,
   "lo": 0.04,
   "hi": 0.118,
-  "holm_p": 0.2231,
+  "holm_p": 0.2427,
   "n_items": 67,
   "winner": null
  },
@@ -2285,7 +2375,7 @@
   "delta": 0.079,
   "lo": 0.04,
   "hi": 0.119,
-  "holm_p": 0.111,
+  "holm_p": 0.1203,
   "n_items": 67,
   "winner": null
  },
@@ -2295,7 +2385,7 @@
   "delta": 0.088,
   "lo": 0.048,
   "hi": 0.13,
-  "holm_p": 0.0444,
+  "holm_p": 0.0479,
   "n_items": 67,
   "winner": "gpt-6-astra"
  },
@@ -2315,7 +2405,7 @@
   "delta": 0.094,
   "lo": 0.044,
   "hi": 0.148,
-  "holm_p": 0.8377,
+  "holm_p": 0.9094,
   "n_items": 67,
   "winner": null
  },
@@ -2345,6 +2435,16 @@
   "delta": 0.003,
   "lo": -0.033,
   "hi": 0.042,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.6",
+  "b": "grok-4.7",
+  "delta": 0.011,
+  "lo": -0.016,
+  "hi": 0.043,
   "holm_p": 1.0,
   "n_items": 67,
   "winner": null
@@ -2455,7 +2555,7 @@
   "delta": 0.058,
   "lo": 0.022,
   "hi": 0.099,
-  "holm_p": 0.6985,
+  "holm_p": 0.7575,
   "n_items": 67,
   "winner": null
  },
@@ -2465,7 +2565,7 @@
   "delta": 0.06,
   "lo": 0.024,
   "hi": 0.102,
-  "holm_p": 0.4082,
+  "holm_p": 0.4439,
   "n_items": 67,
   "winner": null
  },
@@ -2475,7 +2575,7 @@
   "delta": 0.07,
   "lo": 0.033,
   "hi": 0.108,
-  "holm_p": 0.0925,
+  "holm_p": 0.1002,
   "n_items": 67,
   "winner": null
  },
@@ -2485,7 +2585,7 @@
   "delta": 0.073,
   "lo": 0.042,
   "hi": 0.106,
-  "holm_p": 0.013,
+  "holm_p": 0.0139,
   "n_items": 67,
   "winner": "grok-4.6"
  },
@@ -2495,7 +2595,7 @@
   "delta": 0.073,
   "lo": 0.041,
   "hi": 0.106,
-  "holm_p": 0.0205,
+  "holm_p": 0.0221,
   "n_items": 67,
   "winner": "grok-4.6"
  },
@@ -2505,7 +2605,7 @@
   "delta": 0.083,
   "lo": 0.044,
   "hi": 0.122,
-  "holm_p": 0.0295,
+  "holm_p": 0.0319,
   "n_items": 67,
   "winner": "grok-4.6"
  },
@@ -2525,7 +2625,7 @@
   "delta": 0.089,
   "lo": 0.043,
   "hi": 0.137,
-  "holm_p": 0.2981,
+  "holm_p": 0.3246,
   "n_items": 67,
   "winner": null
  },
@@ -2548,6 +2648,16 @@
   "holm_p": 0.0,
   "n_items": 67,
   "winner": "grok-4.6"
+ },
+ {
+  "a": "deepseek-v4-pro",
+  "b": "grok-4.7",
+  "delta": 0.007,
+  "lo": -0.038,
+  "hi": 0.053,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
  },
  {
   "a": "deepseek-v4-pro",
@@ -2675,7 +2785,7 @@
   "delta": 0.067,
   "lo": 0.029,
   "hi": 0.107,
-  "holm_p": 0.4533,
+  "holm_p": 0.4918,
   "n_items": 67,
   "winner": null
  },
@@ -2685,7 +2795,7 @@
   "delta": 0.07,
   "lo": 0.029,
   "hi": 0.11,
-  "holm_p": 0.4082,
+  "holm_p": 0.4438,
   "n_items": 67,
   "winner": null
  },
@@ -2695,7 +2805,7 @@
   "delta": 0.07,
   "lo": 0.029,
   "hi": 0.109,
-  "holm_p": 0.8976,
+  "holm_p": 0.9746,
   "n_items": 67,
   "winner": null
  },
@@ -2705,7 +2815,7 @@
   "delta": 0.079,
   "lo": 0.038,
   "hi": 0.12,
-  "holm_p": 0.2006,
+  "holm_p": 0.218,
   "n_items": 67,
   "winner": null
  },
@@ -2725,7 +2835,7 @@
   "delta": 0.086,
   "lo": 0.035,
   "hi": 0.139,
-  "holm_p": 0.6628,
+  "holm_p": 0.7182,
   "n_items": 67,
   "winner": null
  },
@@ -2748,6 +2858,206 @@
   "holm_p": 0.0,
   "n_items": 67,
   "winner": "deepseek-v4-pro"
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gpt-5.6-terra",
+  "delta": 0.005,
+  "lo": -0.041,
+  "hi": 0.052,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "claude-sonnet-4-6",
+  "delta": 0.022,
+  "lo": -0.012,
+  "hi": 0.057,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gpt-5.4-mini",
+  "delta": 0.027,
+  "lo": -0.015,
+  "hi": 0.066,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "glm-5.3",
+  "delta": 0.029,
+  "lo": -0.026,
+  "hi": 0.084,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "claude-opus-4-8",
+  "delta": 0.03,
+  "lo": -0.01,
+  "hi": 0.072,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "kimi-k3",
+  "delta": 0.03,
+  "lo": -0.02,
+  "hi": 0.084,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "claude-opus-5",
+  "delta": 0.034,
+  "lo": -0.016,
+  "hi": 0.087,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.6-flash",
+  "delta": 0.042,
+  "lo": -0.008,
+  "hi": 0.091,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gpt-5.6-luna",
+  "delta": 0.043,
+  "lo": -0.004,
+  "hi": 0.089,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.1-pro",
+  "delta": 0.046,
+  "lo": -0.0,
+  "hi": 0.097,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.7-flash",
+  "delta": 0.047,
+  "lo": 0.0,
+  "hi": 0.096,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.8-flash",
+  "delta": 0.049,
+  "lo": 0.003,
+  "hi": 0.098,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.5-flash",
+  "delta": 0.059,
+  "lo": 0.014,
+  "hi": 0.104,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "claude-haiku-4-5",
+  "delta": 0.062,
+  "lo": 0.027,
+  "hi": 0.099,
+  "holm_p": 0.3329,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "grok-4.3",
+  "delta": 0.062,
+  "lo": 0.022,
+  "hi": 0.102,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.5-flash-lite",
+  "delta": 0.072,
+  "lo": 0.031,
+  "hi": 0.114,
+  "holm_p": 0.5246,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "claude-sonnet-5",
+  "delta": 0.072,
+  "lo": 0.023,
+  "hi": 0.125,
+  "holm_p": 1.0,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "qwen3.8-max",
+  "delta": 0.078,
+  "lo": 0.035,
+  "hi": 0.127,
+  "holm_p": 0.4607,
+  "n_items": 67,
+  "winner": null
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gemini-3.1-flash-lite",
+  "delta": 0.129,
+  "lo": 0.084,
+  "hi": 0.174,
+  "holm_p": 0.0007,
+  "n_items": 67,
+  "winner": "grok-4.7"
+ },
+ {
+  "a": "grok-4.7",
+  "b": "gpt-5.4-nano",
+  "delta": 0.225,
+  "lo": 0.171,
+  "hi": 0.278,
+  "holm_p": 0.0,
+  "n_items": 67,
+  "winner": "grok-4.7"
  },
  {
   "a": "gpt-5.6-terra",
@@ -3275,7 +3585,7 @@
   "delta": 0.102,
   "lo": 0.063,
   "hi": 0.142,
-  "holm_p": 0.006,
+  "holm_p": 0.0064,
   "n_items": 67,
   "winner": "gpt-5.4-mini"
  },
@@ -3285,7 +3595,7 @@
   "delta": 0.198,
   "lo": 0.146,
   "hi": 0.246,
-  "holm_p": 0.0001,
+  "holm_p": 0.0002,
   "n_items": 67,
   "winner": "gpt-5.4-mini"
  },
@@ -3435,7 +3745,7 @@
   "delta": 0.1,
   "lo": 0.047,
   "hi": 0.151,
-  "holm_p": 0.2577,
+  "holm_p": 0.2803,
   "n_items": 67,
   "winner": null
  },
@@ -3585,7 +3895,7 @@
   "delta": 0.1,
   "lo": 0.055,
   "hi": 0.143,
-  "holm_p": 0.0416,
+  "holm_p": 0.0449,
   "n_items": 67,
   "winner": "claude-opus-4-8"
  },
@@ -3725,7 +4035,7 @@
   "delta": 0.099,
   "lo": 0.037,
   "hi": 0.157,
-  "holm_p": 0.6941,
+  "holm_p": 0.7525,
   "n_items": 67,
   "winner": null
  },
@@ -3975,7 +4285,7 @@
   "delta": 0.087,
   "lo": 0.043,
   "hi": 0.132,
-  "holm_p": 0.0868,
+  "holm_p": 0.094,
   "n_items": 67,
   "winner": null
  },
@@ -3985,7 +4295,7 @@
   "delta": 0.184,
   "lo": 0.129,
   "hi": 0.236,
-  "holm_p": 0.0123,
+  "holm_p": 0.0132,
   "n_items": 67,
   "winner": "gemini-3.6-flash"
  },
@@ -4085,7 +4395,7 @@
   "delta": 0.086,
   "lo": 0.043,
   "hi": 0.129,
-  "holm_p": 0.1853,
+  "holm_p": 0.2013,
   "n_items": 67,
   "winner": null
  },
@@ -4185,7 +4495,7 @@
   "delta": 0.083,
   "lo": 0.034,
   "hi": 0.131,
-  "holm_p": 0.5227,
+  "holm_p": 0.5658,
   "n_items": 67,
   "winner": null
  },
@@ -4195,7 +4505,7 @@
   "delta": 0.18,
   "lo": 0.12,
   "hi": 0.236,
-  "holm_p": 0.0767,
+  "holm_p": 0.0829,
   "n_items": 67,
   "winner": null
  },
@@ -4275,7 +4585,7 @@
   "delta": 0.082,
   "lo": 0.037,
   "hi": 0.126,
-  "holm_p": 0.2072,
+  "holm_p": 0.2253,
   "n_items": 67,
   "winner": null
  },
@@ -4285,7 +4595,7 @@
   "delta": 0.178,
   "lo": 0.124,
   "hi": 0.232,
-  "holm_p": 0.0295,
+  "holm_p": 0.0319,
   "n_items": 67,
   "winner": "gemini-3.7-flash"
  },
@@ -4355,7 +4665,7 @@
   "delta": 0.08,
   "lo": 0.034,
   "hi": 0.124,
-  "holm_p": 0.3048,
+  "holm_p": 0.332,
   "n_items": 67,
   "winner": null
  },
@@ -4365,7 +4675,7 @@
   "delta": 0.176,
   "lo": 0.119,
   "hi": 0.23,
-  "holm_p": 0.0438,
+  "holm_p": 0.0474,
   "n_items": 67,
   "winner": "gemini-3.8-flash"
  },
@@ -4425,7 +4735,7 @@
   "delta": 0.07,
   "lo": 0.029,
   "hi": 0.109,
-  "holm_p": 0.3485,
+  "holm_p": 0.3788,
   "n_items": 67,
   "winner": null
  },
@@ -4435,7 +4745,7 @@
   "delta": 0.166,
   "lo": 0.111,
   "hi": 0.219,
-  "holm_p": 0.0523,
+  "holm_p": 0.0565,
   "n_items": 67,
   "winner": null
  },
@@ -4495,7 +4805,7 @@
   "delta": 0.163,
   "lo": 0.105,
   "hi": 0.215,
-  "holm_p": 0.0302,
+  "holm_p": 0.0326,
   "n_items": 67,
   "winner": "claude-haiku-4-5"
  },
@@ -4545,7 +4855,7 @@
   "delta": 0.163,
   "lo": 0.109,
   "hi": 0.215,
-  "holm_p": 0.2062,
+  "holm_p": 0.2242,
   "n_items": 67,
   "winner": null
  },
@@ -4575,7 +4885,7 @@
   "delta": 0.057,
   "lo": 0.025,
   "hi": 0.093,
-  "holm_p": 0.6739,
+  "holm_p": 0.7305,
   "n_items": 67,
   "winner": null
  },
@@ -4585,7 +4895,7 @@
   "delta": 0.154,
   "lo": 0.098,
   "hi": 0.208,
-  "holm_p": 0.1718,
+  "holm_p": 0.1865,
   "n_items": 67,
   "winner": null
  },
@@ -4615,7 +4925,7 @@
   "delta": 0.153,
   "lo": 0.091,
   "hi": 0.213,
-  "holm_p": 0.0112,
+  "holm_p": 0.0121,
   "n_items": 67,
   "winner": "claude-sonnet-5"
  },
@@ -4635,7 +4945,7 @@
   "delta": 0.147,
   "lo": 0.083,
   "hi": 0.21,
-  "holm_p": 0.0835,
+  "holm_p": 0.0904,
   "n_items": 67,
   "winner": null
  },

@@ -530,7 +530,7 @@ models:
   # --- xAI (OpenAI-compatible endpoint; https://api.x.ai/v1) ---
   # xAI is NOT a capability ladder. Where the other labs ship a flagship/mid/cheap
   # spread, xAI ships one frontier model with reasoning-effort dials. So this is
-  # new-vs-previous, and the line is now three deep: 4.6 -> 4.5 -> 4.3.
+  # new-vs-previous, and the line is now four deep: 4.7 -> 4.6 -> 4.5 -> 4.3.
   # REASONING EFFORT, re-read 2026-08-12 (the docs have MOVED since 2026-07-08):
   # the model-capabilities page now says "`grok-4.6` and `grok-4.5` support the
   # `reasoning_effort` parameter... If not specified, `reasoning_effort` defaults
@@ -547,6 +547,10 @@ models:
   # measurements, and we publish the default.
   # `max_completion_tokens` bounds only VISIBLE output on xAI — reasoning tokens are
   # unbounded and bill as output. There is no cost ceiling; gate spend before a run.
+  # 2026-09-21: grok-4.7 landed in the SAME $2 / $0.50 / $6 slot, 500k ctx, reasoning
+  # default `high` (docs: "grok-4.7, grok-4.6, and grok-4.5 support the reasoning_effort
+  # parameter... defaults to high. Reasoning cannot be disabled"), so 4.7-vs-4.6 is the
+  # second clean model-only A/B in this line. Batch: rejected outright, same as 4.6.
   # BATCH IS NOW IMPOSSIBLE FOR 4.6 AND 4.5, and the reason CHANGED on 2026-08-12.
   # It used to be economic (batch accepted grok-4.5 at a 0% discount, so live was
   # simpler). It is now a hard rejection: the docs warn "`grok-4.6` and `grok-4.5`
@@ -562,6 +566,28 @@ models:
   # Prompt caching (cached input $0.50 / $0.30 / $0.20) evaluated and declined:
   # input is ~10% of spend. It needs no header plumbing — `prompt_cache_key` is a
   # plain body param. Never set `service_tier: "priority"` — it bills at 2x.
+  - name: grok-4.7
+    provider: xai
+    id: grok-4.7
+    base_url: https://api.x.ai/v1
+    label: "Grok 4.7"            # spaced so `_lineage` reads version 4.7 and retires "Grok 4.6"
+    released: "2026-09-21"       # x.ai/news index read in a browser 2026-09-21: "Grok 4.7 — Sep 21,
+                                 # 2026 — Introducing Grok 4.7" (launch day, scored the same day).
+                                 # docs.x.ai release notes file it under "September" with no day;
+                                 # the API `created` stamp is 2026-09-01, twenty days early —
+                                 # for xAI `created` is a checkpoint date, never a release date.
+    price_in: 2                  # <200k prompt tokens; the >=200k tier is $4/$12, never hit on this bank
+    price_out: 6
+    price_cached_in: 0.5         # same slot as 4.6 (pricing page + models API 5000 ticks = $0.50/1M)
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    batch_supported: false       # HARD rejection, probed 2026-09-21 with notes/batch_probe.py:
+                                 # "Model grok-4.7 is not supported for batch processing" (4.6 same,
+                                 # 4.3 control ACCEPTED). The pricing page's "20% off standard rates"
+                                 # line for 4.7 is wrong against the live API — the API wins.
+    price_verified: "2026-09-21"
+    price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.6
     provider: xai
     id: grok-4.6
