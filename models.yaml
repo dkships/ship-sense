@@ -28,6 +28,8 @@
 # had been delisted. Read a pricing page IN A BROWSER before calling a model
 # missing. (Google has the mirror-image trap: its .md.txt mirror goes stale
 # while the HTML is correct — read the HTML.);
+# 2026-09-22: claude-opus-5-5 verified against the Models API on launch day; batch
+# eligibility + the 8192 cap probed against the Batch API (notes/anthropic_batch_probe.py);
 # 2026-07-24: claude-opus-5 verified against the Models API on launch day and its
 # batch eligibility probed against the Batch API, not the docs — accepted, 50%;
 # 2026-07-31: gpt-5.6 batch eligibility RE-PROBED and now PASSES for all three —
@@ -100,6 +102,24 @@ models:
     batch_supported: true
     batch_discount: 0.5
     price_verified: "2026-08-24"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-opus-5-5
+    provider: anthropic
+    id: claude-opus-5-5
+    label: "Claude Opus 5.5"        # spaced so `_lineage` reads version 5.5 and retires "Claude Opus 5"
+    released: "2026-09-22"       # anthropic.com/news/claude-opus-5-5 ("now available on all
+                                 # platforms"), dated September 22, 2026. The Models API reports
+                                 # created_at 2026-09-21T16:24Z — the checkpoint, one day early,
+                                 # the Fable 5.1 / Grok 4.6 pattern. Announcement wins.
+    price_in: 4                  # 20% BELOW the $5/$25 Opus 5 slot it retires; cache read $0.20
+    price_out: 20                # (0.05x, not the usual 0.1x). Thinking can no longer be switched
+                                 # off and the shipped default effort is `medium` (Opus 5: `high`),
+                                 # so 5.5-vs-5 is a model+default-effort comparison, not model-only.
+    api: messages
+    structured_outputs: true
+    batch_supported: true        # probed against the Batch API 2026-09-22, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-09-22"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-5
     provider: anthropic
