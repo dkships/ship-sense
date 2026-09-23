@@ -20,7 +20,7 @@ Muse Spark 1.3 leads the current lineup at 89.9, Claude Fable 5.1 at 89.7; ten m
 
 ## v3.5.2 — chart clarity and v4 preparation
 
-Give generation-chart endpoint scores room on both sides. Chart verdicts now match the Holm-adjusted comparisons: measured gain, measured loss, or no detected difference. All 31 model scores are unchanged.
+Give generation-chart endpoint scores room on both sides. Chart verdicts now match the Holm-adjusted comparisons: measured gain, measured loss, or a not-significant lean. All 31 model scores are unchanged.
 
 The [v4 protocol](docs/history/v4-workflow-draft/NEXT_VERSION.md) adds paired evidence checks for Honesty and a three-provider reference panel. The scorer and bounded native-batch runner are ready for qualification; v4 has no new model results yet. Current scores stay available while those checks run.
 
