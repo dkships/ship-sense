@@ -31,7 +31,11 @@ ids=$(
     basename "$p" .yaml
   done | { grep -v '^example_' || true; } | sort -u
 )
-prefixes=$(printf '%s\n' $ids | sed 's/_.*/_/' | sort -u)
+# A prefix is scanned because it is normally a client-name token. A generic
+# English prefix is not one, and matches public field names ("support_flags"),
+# so it is dropped here; the full ids that carry it are still scanned above.
+generic_prefixes='^support_$'
+prefixes=$(printf '%s\n' $ids | sed 's/_.*/_/' | sort -u | { grep -Ev "$generic_prefixes" || true; })
 leak=""
 for tok in $ids $prefixes; do
   hits=$(git grep -l -- "$tok" 2>/dev/null || true)

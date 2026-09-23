@@ -27,7 +27,12 @@ OFFICIAL_DOCS = {
     "openai": "https://developers.openai.com/api/docs/guides/batch",
     "anthropic": "https://docs.anthropic.com/en/docs/build-with-claude/batch-processing",
     "google": "https://ai.google.dev/gemini-api/docs/batch-api",
+    "mistral": "https://docs.mistral.ai/capabilities/batch/",
 }
+MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
+MISTRAL_CHAT_ENDPOINT = "/v1/chat/completions"
+MISTRAL_TERMINAL = {"SUCCESS", "FAILED", "TIMEOUT_EXCEEDED", "CANCELLED"}
+MISTRAL_SUCCESS = "SUCCESS"
 
 # Bound every request this module makes on a client it built itself. A batch
 # lifecycle is long and mostly idle, so a socket can die between polls -- the
@@ -331,6 +336,26 @@ def _gemini_request(custom: str, cfg: dict, messages: list[dict],
     return {"key": custom, "request": req}
 
 
+def _mistral_request(custom: str, cfg: dict, messages: list[dict],
+                     schema: str, item: dict, max_tokens: int) -> dict:
+    """Mistral batch line: the same chat-completions body the live adapter sends
+    (system message inline, strict json_schema), minus `model`, which Mistral
+    sets once per job. `max_tokens` is Mistral's native cap name; the live
+    path's `max_completion_tokens` was verified to bound output identically."""
+    body: dict[str, Any] = {
+        "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+        "max_tokens": max_tokens,
+    }
+    response_schema = _schema_format(schema, item, "mistral", cfg)
+    if response_schema:
+        body["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": f"ship_sense_{schema}", "strict": True,
+                            "schema": response_schema},
+        }
+    return {"custom_id": custom, "body": body}
+
+
 def provider_request(custom: str, cfg: dict, messages: list[dict],
                      schema: str, item: dict, max_tokens: int) -> dict:
     provider = cfg["provider"]
@@ -340,6 +365,8 @@ def provider_request(custom: str, cfg: dict, messages: list[dict],
         return _anthropic_request(custom, cfg, messages, schema, item, max_tokens)
     if provider == "google":
         return _gemini_request(custom, cfg, messages, schema, item, max_tokens)
+    if provider == "mistral":
+        return _mistral_request(custom, cfg, messages, schema, item, max_tokens)
     raise ValueError(f"{provider!r} does not have a native batch adapter")
 
 
@@ -534,7 +561,36 @@ def _result_from_line(provider: str, cfg: dict, line: dict) -> tuple[str, provid
             cost_usd=providers.estimate_cost_usd(cfg, usage, "batch"),
             structured_output="json_schema",
         )
+    if provider == "mistral":
+        return _mistral_result(cfg, line)
     raise ValueError(f"unknown provider {provider!r}")
+
+
+def _mistral_result(cfg: dict, line: dict) -> tuple[str, providers.ProviderResult]:
+    """One Mistral batch output line: {custom_id, response: {status_code, body},
+    error}. `body` is an ordinary chat completion."""
+    cid = line["custom_id"]
+    response = line.get("response") or {}
+    body = response.get("body") or {}
+    status = response.get("status_code", 200)
+    if line.get("error") or status >= 400 or not body.get("choices"):
+        return cid, providers.ProviderResult(
+            text="", provider="mistral", model=cfg["id"], run_mode="batch",
+            request_id=body.get("id"), error=json.dumps(line.get("error") or body or line),
+        )
+    choice = body["choices"][0]
+    usage = providers.normalize_usage(body.get("usage"))
+    return cid, providers.ProviderResult(
+        text=(choice.get("message") or {}).get("content") or "",
+        provider="mistral",
+        model=body.get("model") or cfg["id"],
+        run_mode="batch",
+        request_id=body.get("id"),
+        finish_reason=choice.get("finish_reason"),
+        usage=usage,
+        cost_usd=providers.estimate_cost_usd(cfg, usage, "batch"),
+        structured_output="json_schema",
+    )
 
 
 def _merge_raw(run_id: str, model_name: str, item: dict, generation: int,
@@ -749,6 +805,71 @@ def download_anthropic(job_file: Path, output: Path | None = None,
         for result in client.messages.batches.results(job["batch_id"]):
             f.write(json.dumps(_to_plain(result), separators=(",", ":")) + "\n")
     return out
+
+
+def _mistral_http() -> Any:
+    import os
+    import httpx
+    key = os.environ["MISTRAL_API_KEY"]
+    return httpx.Client(base_url=MISTRAL_BASE_URL, timeout=BATCH_HTTP_TIMEOUT_S,
+                        headers={"Authorization": f"Bearer {key}"})
+
+
+def submit_mistral(manifest_path: Path, client: Any | None = None) -> Path:
+    """Upload the stage JSONL (purpose=batch) and create one job for its model."""
+    client = client or _mistral_http()
+    manifest = json.loads(manifest_path.read_text())
+    if manifest["provider"] != "mistral":
+        raise ValueError("submit-mistral requires a Mistral manifest")
+    req_file = ROOT / manifest["requests_file"]
+    uploaded = client.post("/files", files={"file": (req_file.name, req_file.read_bytes())},
+                           data={"purpose": "batch"})
+    uploaded.raise_for_status()
+    file_id = uploaded.json()["id"]
+    job = client.post("/batch/jobs", json={
+        "input_files": [file_id],
+        "model": manifest["model_id"],
+        "endpoint": MISTRAL_CHAT_ENDPOINT,
+        "metadata": {"eval": "ship-sense", "run_id": manifest["run_id"],
+                     "stage": manifest["stage_id"]},
+    })
+    job.raise_for_status()
+    out = manifest_path.parent / "mistral-batch.json"
+    out.write_text(json.dumps({"input_file_id": file_id, "job_id": job.json()["id"]}, indent=2))
+    return out
+
+
+def status_mistral(job_file: Path, client: Any | None = None,
+                   out: Path | None = None) -> dict:
+    client = client or _mistral_http()
+    job = json.loads(job_file.read_text())
+    resp = client.get(f"/batch/jobs/{job['job_id']}")
+    resp.raise_for_status()
+    status = resp.json()
+    _json_write(out or (job_file.parent / "mistral-status.json"), status)
+    return status
+
+
+def download_mistral(job_file: Path, output: Path | None = None,
+                     output_dir: Path | None = None,
+                     client: Any | None = None) -> dict[str, str]:
+    client = client or _mistral_http()
+    status = status_mistral(job_file, client)
+    out_dir = output_dir or job_file.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written: dict[str, str] = {}
+    for field, default_name in (("output_file", "results.jsonl"), ("error_file", "errors.jsonl")):
+        file_id = status.get(field)
+        if not file_id:
+            continue
+        resp = client.get(f"/files/{file_id}/content")
+        resp.raise_for_status()
+        dest = (output if field == "output_file" and output else out_dir / default_name)
+        dest.write_text(resp.text)
+        written["results_file" if field == "output_file" else "errors_file"] = str(dest)
+    if not written:
+        raise RuntimeError("Mistral job has no output_file or error_file")
+    return written
 
 
 def submit_gemini(manifest_path: Path, client: Any | None = None,

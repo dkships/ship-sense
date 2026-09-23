@@ -28,6 +28,9 @@ features:
   - id: anomaly_narrative
     label: "Auto-written 'what changed this week' anomaly narrative"
 prompt: >
+  Definitions: SHIP = build it in this cycle/scope. DEFER = worth doing, but not now: it waits
+  on a precondition, evidence, or capacity that is missing today. KILL = do not build it as
+  proposed; more time or capacity would not change that.
   For EACH feature id, decide SHIP, DEFER, or KILL for v1 and give a one-line reason
   grounded in the data you were given.
   Return ONLY JSON: {"classifications": {"<feature_id>": "SHIP|DEFER|KILL", ...},

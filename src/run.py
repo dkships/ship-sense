@@ -17,8 +17,10 @@ from pathlib import Path
 
 from . import grade, leaderboard, loader, providers
 
-SYSTEM = ("You are a senior product manager. Be decisive and concise, reason "
-          "from the data you are given, and follow the output format exactly.")
+# v4.0: "decisive and concise" removed; it contradicted the "list every" prompts
+# and nudged Conviction answers.
+SYSTEM = ("You are a senior product manager. Reason from the data you are given, "
+          "and follow the output format exactly.")
 ROOT = Path(__file__).resolve().parent.parent
 
 

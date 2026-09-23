@@ -270,6 +270,44 @@ models:
     batch_discount: 0.5          # pricing page lists batch at $5 / $25 — exactly 50% off
     price_verified: "2026-09-04"
     price_source: "https://developers.openai.com/api/docs/pricing"
+  # GPT-6 Sol + Luna — announced 2026-09-22 (community.openai.com post dated
+  # 09-22; openai.com/index/introducing-gpt-6-sol-and-luna returns 403 to fetch).
+  # Both listed on /v1/models the same day; NO gpt-6-terra exists on /v1/models or
+  # the pricing page, so GPT-5.6 Terra stays current. Model pages: default
+  # reasoning.effort medium (none..max allowed; the harness sets none), 1.05M
+  # context, 128k max output, structured outputs, Batch on v1/batch at 50%.
+  # Same-line successors of GPT-5.6 Sol / Luna: `_lineage` retires those
+  # automatically ("gpt sol" 6 > 5.6), no superseded_by needed.
+  - name: gpt-6-sol
+    provider: openai
+    id: gpt-6-sol
+    label: "GPT-6 Sol"
+    released: "2026-09-22"
+    price_in: 2
+    price_out: 10
+    price_cached_in: 0.2
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    batch_supported: true        # model page lists v1/batch; re-probed before the run
+    batch_discount: 0.5          # pricing page: batch $1 / $5
+    price_verified: "2026-09-22"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-6-luna
+    provider: openai
+    id: gpt-6-luna
+    label: "GPT-6 Luna"
+    released: "2026-09-22"
+    price_in: 0.1
+    price_out: 0.5
+    price_cached_in: 0.01
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    batch_supported: true        # model page lists v1/batch; re-probed before the run
+    batch_discount: 0.5          # pricing page: batch $0.05 / $0.25
+    price_verified: "2026-09-22"
+    price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.6-sol
     provider: openai
     id: gpt-5.6-sol
@@ -1242,6 +1280,107 @@ models:
     batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed
     price_verified: "2026-08-24"
     price_source: "https://docs.z.ai/guides/overview/pricing"
+
+  # --- MiniMax — 10th lab, added 2026-09-22 (MiniMax-M3, released 2026-06-01) ---
+  # ONE model, the standing one-flagship-per-new-lab pattern. NOT a launch-day
+  # add: M3 was released 2026-06-01 per MiniMax's own model release notes
+  # (platform.minimax.io/docs/release-notes/models: "Jun. 1, 2026 — Released
+  # MiniMax-M3"), and GET /v1/models reports created 1780272000 = the same day.
+  #
+  # ADAPTER: provider `minimax` -> providers.MiniMaxProvider, NOT the generic
+  # OpenAI-compatible class, for three documented traps (re-read 2026-09-22):
+  # - thinking is INLINE: content = "<think>...</think>" + answer. The adapter
+  #   strips the leading block (trace field thinking_stripped) instead of
+  #   sending reasoning_split, which keeps the one-request-parameter rule; the
+  #   block is re-inlined into multi-turn history verbatim, per MiniMax's
+  #   "do not modify the content field" guidance. Probe: a 2-turn exchange with
+  #   the re-inlined think was accepted and both turns parsed.
+  # - NO response_format on M3 (not even json_object), so nothing is sent and
+  #   the trace records structured_output null; the JSON contract is the
+  #   prompt's, as for DeepSeek/GLM but without their json_object switch.
+  # - errors can arrive as base_resp.status_code != 0 on HTTP 200: 1002 rate
+  #   limit and 1041 connection limit are backed off and retried; everything
+  #   else (1008 balance, 2056 quota window, 2013 params, ...) raises at once.
+  #
+  # LANE: LIVE. The docs index (platform.minimax.io/docs/llms.txt) mentions no
+  # batch API anywhere. Probed 2026-09-22 anyway: GET /v1/batches answers
+  # 403 "batch api is not available for this account (2119)" (/v1/files and
+  # /v1/batch/jobs 404). So an undocumented, account-gated batch surface
+  # exists; it is not available to us and has no published discount. Re-probe
+  # if MiniMax documents it.
+  #
+  # PROBED 2026-09-22 before the run (notes/minimax_sizing_probe.py, ~$0.02):
+  # - CAP SEMANTICS: cap bounds thinking AND answer together. At 64 tokens,
+  #   finish "length", 62 output tokens, and the answer was cut to one word
+  #   ("Products") after the think ate the rest. Truncation does NOT fail safe.
+  # - USAGE: total == prompt + completion (247 = 185 + 62), so thinking is
+  #   INSIDE completion_tokens; cached_tokens (128 of 185) is a subset of
+  #   prompt. normalize_usage and price_cached_in apply unchanged.
+  # - SIZING: the 5 items deepseek-v4-pro answered longest on 2026-09-22-v4
+  #   (10.6k-15.1k tokens there) returned 2,352 / 2,681 / 2,450 / 4,614 /
+  #   2,472 output tokens, all finish "stop", all parsed by grade.parse_json
+  #   with the right keys. Worst = 56% of the 8,192 default, so the 70% rule
+  #   alone would keep 8192.
+  # max_tokens 32768 ANYWAY, the GLM-5.3 call (55%, same shape): thinking and
+  # answer share the cap, adaptive thinking length varies by prompt, a probe
+  # bounds the typical case not the tail (the Gemini 3.8 Flash lesson), and a
+  # silent truncation scores as wrong or, on conviction, inflates. The vendor
+  # itself RECOMMENDS 131072 for M3 (max 524288). A higher cap costs nothing
+  # unless used. 32768 = 7x the worst measured.
+  #
+  # SHIPPED DEFAULTS: omitted `thinking` = adaptive thinking ON (the docs:
+  # "When omitted, adaptive thinking is enabled by default"); temperature
+  # default 1, top_p 0.95. The harness sets none of them.
+  #
+  # PRICE (platform.minimax.io/docs/guides/pricing-paygo, Standard tier,
+  # <=512k input): $0.30 in / $1.20 out / $0.06 cache read, shown as a
+  # "Permanent 50% off" of $0.60/$2.40/$0.12. The discounted figure is the
+  # list price we pay. >512k input reprices the whole request 2x; no item
+  # here comes close. Priority tier (service_tier) is 1.5x and not used.
+  #
+  # LIMITS: M3 = 200 RPM / 10M TPM (integration review); --workers 4 is well
+  # inside that. timeout_s 900: non-streamed; the 5 sizing calls took 132s
+  # in total (~26s each), so 900 is generous headroom for a long think.
+  - name: minimax-m3
+    provider: minimax
+    id: MiniMax-M3
+    base_url: https://api.minimax.io/v1
+    # Spaced label so _lineage reads "M3" as version 3 ([kmv] prefix) and a
+    # future "MiniMax M4" auto-retires this row.
+    label: "MiniMax M3"
+    released: "2026-06-01"       # platform.minimax.io/docs/release-notes/models
+    price_in: 0.3
+    price_out: 1.2
+    price_cached_in: 0.06        # cache read; cached ⊂ prompt_tokens (probe-verified)
+    api: chat_completions
+    structured_outputs: false    # M3 has no response_format at all; prompt-level JSON
+    max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
+    timeout_s: 900
+    batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account
+    price_verified: "2026-09-22"
+    price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
+
+  # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
+  # The flagship: docs.mistral.ai models overview calls it "frontier-class";
+  # no Large line is listed on /v1/models any more. Every medium id on the
+  # account (mistral-medium-3-5 / -3.5 / -2604 / -latest) aliases one model;
+  # pin the concrete id. Released 2026-04-28 (docs model card), $1.5/$7.5.
+  # Batch: Mistral's own Batch API (/v1/files purpose=batch + /v1/batch/jobs),
+  # 50% off per the docs; src/batch.py carries a mistral dialect.
+  - name: mistral-medium-3-5
+    provider: mistral
+    id: mistral-medium-3-5
+    base_url: https://api.mistral.ai/v1
+    label: "Mistral Medium 3.5"
+    released: "2026-04-28"
+    price_in: 1.5
+    price_out: 7.5
+    api: chat_completions
+    structured_outputs: true     # strict json_schema accepted (probe 2026-09-22)
+    batch_supported: true
+    batch_discount: 0.5
+    price_verified: "2026-09-22"
+    price_source: "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5"
 
   # --- Deterministic, no network. Used by tests + scaffold + the gameability floor. ---
   - name: mock-strong
