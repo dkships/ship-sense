@@ -6655,7 +6655,7 @@
           "name": "claude-haiku-4-5",
           "label": "Claude Haiku 4.5",
           "provider": "anthropic",
-          "released": "2025-10-01",
+          "released": "2025-10-15",
           "price_in": 1,
           "price_out": 5,
           "batch_discount": 0.5,
