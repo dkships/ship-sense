@@ -360,3 +360,138 @@ def test_gemini_finish_reason_is_none_when_absent():
     assert providers._gemini_finish_reason(type("R", (), {})()) is None
     cand = type("C", (), {"finish_reason": None})()
     assert providers._gemini_finish_reason(type("R", (), {"candidates": [cand]})()) is None
+
+
+# --- MiniMax ------------------------------------------------------------------
+
+class _FakeMiniMaxModule:
+    """`openai` stand-in whose replies are scripted: each entry is either a
+    content string (a success) or an int (a base_resp error code on HTTP 200)."""
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls: list[dict] = []
+
+    def OpenAI(self, **_):                            # noqa: N802 - SDK's name
+        fake = self
+        completions = type("Cp", (), {"create": lambda _self, **kw: fake._reply(kw)})()
+        chat = type("Ch", (), {"completions": completions})()
+        return type("Cl", (), {"chat": chat})()
+
+    def _reply(self, kwargs):
+        self.calls.append(kwargs)
+        nxt = self.replies.pop(0)
+        if isinstance(nxt, int):
+            base = {"status_code": nxt, "status_msg": "err"}
+            return type("R", (), {"choices": None, "usage": None, "id": "e",
+                                  "base_resp": base})()
+        finish = "length" if nxt.endswith("CUT") else "stop"
+        msg = type("M", (), {"content": nxt})()
+        choice = type("C", (), {"message": msg, "finish_reason": finish})()
+        usage = {"prompt_tokens": 1000, "completion_tokens": 500, "total_tokens": 1500,
+                 "prompt_tokens_details": {"cached_tokens": 400}}
+        return type("R", (), {"choices": [choice], "usage": usage, "id": "req_mm",
+                              "base_resp": {"status_code": 0, "status_msg": ""}})()
+
+
+_MM_CFG = {"name": "mm", "provider": "minimax", "id": "MiniMax-M3",
+           "price_in": 0.3, "price_out": 1.2, "price_cached_in": 0.06}
+
+
+def _minimax(monkeypatch, replies):
+    import sys
+    fake = _FakeMiniMaxModule(replies)
+    monkeypatch.setitem(sys.modules, "openai", fake)
+    monkeypatch.setenv("MINIMAX_API_KEY", "x")
+    monkeypatch.setattr(providers.time, "sleep", lambda _s: None)
+    return fake, providers.get_provider(_MM_CFG)
+
+
+def test_minimax_sends_only_the_output_cap(monkeypatch):
+    """Shipped defaults: no response_format (M3 has none), no thinking or
+    reasoning_split, no sampling params -- the cap is the one parameter."""
+    fake, prov = _minimax(monkeypatch, ['<think>x</think>\n{"ok": true}'])
+    prov.chat_result([{"role": "user", "content": "hi"}], schema="honesty",
+                     max_tokens=777)
+    assert set(fake.calls[0]) == {"model", "messages", "max_completion_tokens"}
+    assert fake.calls[0]["max_completion_tokens"] == 777
+
+
+def test_minimax_strips_inline_thinking_and_records_it(monkeypatch):
+    _, prov = _minimax(monkeypatch, ['<think>\nbraces {"a": 1} here\n</think>\n\n{"ok": true}'])
+    res = prov.chat_result([{"role": "user", "content": "hi"}])
+    assert res.text == '{"ok": true}'
+    assert res.thinking_stripped is True
+    assert res.to_json()["thinking_stripped"] is True
+    assert "reasoning_content" not in res.to_json()
+    assert res.structured_output is None
+
+
+def test_minimax_reply_without_think_is_untouched(monkeypatch):
+    _, prov = _minimax(monkeypatch, ['{"ok": true} <think>not a prefix</think>'])
+    res = prov.chat_result([{"role": "user", "content": "hi"}])
+    assert res.text == '{"ok": true} <think>not a prefix</think>'
+    assert res.thinking_stripped is False
+
+
+def test_minimax_think_cut_by_the_cap_leaves_an_empty_answer(monkeypatch):
+    """At a tight cap the think never closes; its text must not reach the
+    grader as the answer, and finish_reason stays "length" for the gate."""
+    _, prov = _minimax(monkeypatch, ['<think>{"half": 1} still thinking CUT'])
+    res = prov.chat_result([{"role": "user", "content": "hi"}])
+    assert res.text == ""
+    assert res.finish_reason == "length"
+
+
+def test_minimax_history_gets_its_think_block_back(monkeypatch):
+    """MiniMax: keep the assistant content verbatim, <think> included, in later
+    turns. run.py carries the block as reasoning_content; the adapter re-inlines
+    it and never sends the field MiniMax does not define."""
+    from src.run import _assistant_msg
+    think = "<think>\nplan\n</think>\n\n"
+    fake, prov = _minimax(monkeypatch, [think + '{"a": 1}', '{"b": 2}'])
+    msgs = [{"role": "user", "content": "one"}]
+    first = prov.chat_result(msgs)
+    msgs += [_assistant_msg(first), {"role": "user", "content": "two"}]
+    prov.chat_result(msgs)
+    sent = fake.calls[1]["messages"][1]
+    assert sent == {"role": "assistant", "content": think + '{"a": 1}'}
+
+
+def test_minimax_usage_and_cost(monkeypatch):
+    """completion_tokens already includes thinking; cached is a subset of prompt."""
+    _, prov = _minimax(monkeypatch, ['{"ok": true}'])
+    res = prov.chat_result([{"role": "user", "content": "hi"}])
+    assert res.usage["output_tokens"] == 500
+    assert res.usage["cached_input_tokens"] == 400
+    want = (600 * 0.3 + 400 * 0.06 + 500 * 1.2) / 1_000_000
+    assert abs(res.cost_usd - want) < 1e-12
+
+
+def test_minimax_base_resp_rate_limit_is_retried(monkeypatch):
+    fake, prov = _minimax(monkeypatch, [1002, 1041, '{"ok": true}'])
+    res = prov.chat_result([{"role": "user", "content": "hi"}])
+    assert res.text == '{"ok": true}'
+    assert len(fake.calls) == 3
+
+
+def test_minimax_base_resp_fatal_codes_raise_at_once(monkeypatch):
+    import pytest
+    for code in (1008, 2056, 2013):
+        fake, prov = _minimax(monkeypatch, [code, '{"ok": true}'])
+        with pytest.raises(providers.MiniMaxError) as err:
+            prov.chat_result([{"role": "user", "content": "hi"}])
+        assert err.value.code == code
+        assert len(fake.calls) == 1
+
+
+def test_minimax_rate_limit_gives_up_eventually(monkeypatch):
+    import pytest
+    _, prov = _minimax(monkeypatch, [1002] * providers._MINIMAX_ATTEMPTS)
+    with pytest.raises(providers.MiniMaxError):
+        prov.chat_result([{"role": "user", "content": "hi"}])
+
+
+def test_non_minimax_traces_keep_their_shape():
+    res = providers.ProviderResult(text="x", provider="openai", model="m")
+    assert "thinking_stripped" not in res.to_json()

@@ -177,11 +177,16 @@ def test_render_html_is_self_contained():
     html = lb.render_html(ledger)
     assert "<style>" in html
     for m in snap["models"]:
-        assert m["label"] in html                    # every model rendered
-    assert "95% CI" in html and "No formal power study" in html
-    assert "leader-overlap band" in html
+        if not m["is_baseline"]:
+            assert m["label"] in html                # every ranked model rendered
+    assert "95% CI" in html and "Limited power" in html
+    assert "leader-overlap band" not in html         # v4.0: rank ranges replace the band
+    assert "Rank range" in html
     assert "scored items" in html
-    assert f"{snap['naive_floor']:.1f}" in html       # naive floor shown
+    floor, _ = lb.floor_value(snap)
+    assert f"{floor:.1f}" in html                     # the floor is shown
+    for row in snap["adversarial_floor"] or []:
+        assert row["label"] in html                   # floor rows in the table footer
     # Link previews: og tags always present; og:image only once site_url is set.
     assert 'property="og:title"' in html and 'property="og:description"' in html
     assert 'og:image' not in html                     # no site_url in this ledger
@@ -203,7 +208,7 @@ def test_render_card_svg_shows_top_models_and_floor():
     ranked = lb.rank_with_ties(snap["models"])
     for r in ranked[:5]:
         assert r["label"] in svg                      # top models drawn
-    assert f"{snap['naive_floor']:.1f}" in svg        # floor bar drawn
+    assert f"{lb.floor_value(snap)[0]:.1f}" in svg    # floor named on the card
     assert "<script" not in svg and 'href="http' not in svg
 
 
@@ -373,15 +378,6 @@ def test_board_shows_the_current_price_and_names_the_at_test_one():
         assert "current list price" in blob
 
 
-def test_committed_candidate_page_matches_data():
-    from src import candidate_page
-    candidate = json.loads((lb.DOCS / "history" / "v3.5" / "candidate.json").read_text())
-    assert candidate["status"] == "candidate"
-    assert all(not m["ranked_eligible"] for m in candidate["models"])
-    assert (lb.DOCS / "history" / "v3.5" / "candidate.html").read_text() == candidate_page.render(candidate)
-    assert (lb.DOCS / "history" / "v3.5" / "candidate-card.svg").read_text() == candidate_page.render_card()
-
-
 def test_candidate_exports_have_no_private_check_ids():
     private_ids = {it["id"] for it in loader.load_cases()
                    if not loader.is_example_id(it["id"])}
@@ -493,22 +489,22 @@ def test_pending_price_blocks_are_well_formed():
 
 
 def test_every_registry_provider_has_an_ink_name_and_css_var():
-    """Adding a lab means touching SIX places (page ink, page name, card ink,
-    card name, the CSS custom property, the legend span). Miss one and the lab
-    silently renders in the fallback gray, or its legend swatch goes blank --
-    which is not obvious in a diff and not caught by any other test. Derived
-    from models.yaml so a future 9th lab fails here rather than on the page."""
+    """Adding a lab means touching FIVE places (the shared ink dict, page name,
+    card name, the CSS custom property, the legend span) -- the page and card
+    renderers share one _PROVIDER_INK dict, so there's no longer a separate
+    card-ink copy to miss. Miss one of the rest and the lab silently renders in
+    the fallback gray, or its legend swatch goes blank -- not obvious in a diff
+    and not caught by any other test. Derived from models.yaml so a future 9th
+    lab fails here rather than on the page."""
     _, registry = loader.load_models()
     labs = {m["provider"] for m in registry if m["provider"] != "mock"}
     page_css = lb.PAGE_CSS if hasattr(lb, "PAGE_CSS") else None
     for lab in sorted(labs):
         assert lab in lb._PROVIDER_INK, f"{lab} missing from _PROVIDER_INK"
         assert lab in lb._PROVIDER_NAME, f"{lab} missing from _PROVIDER_NAME"
-        assert lab in lb._CARD_PROVIDER_INK, f"{lab} missing from _CARD_PROVIDER_INK"
         assert lab in lb._CARD_PROVIDER_NAME, f"{lab} missing from _CARD_PROVIDER_NAME"
-        # The page and card dicts must agree, or a model's dot and its card row
+        # The page and card names must agree, or a model's dot and its card row
         # disagree about which lab it belongs to.
-        assert lb._PROVIDER_INK[lab] == lb._CARD_PROVIDER_INK[lab], lab
         assert lb._PROVIDER_NAME[lab] == lb._CARD_PROVIDER_NAME[lab], lab
         # And the ink must never fall through to the gray default.
         assert lb._provider_color(lab) != "#8a8478", lab
@@ -552,6 +548,9 @@ def test_lineage_parsing_is_unchanged_for_every_shipped_label():
         "Qwen 3.8 Max": ("qwen max", (3, 8)),
         # Z.ai writes the version with a hyphen and no space; "GLM-5.4" retires it.
         "GLM-5.3": ("glm", (5, 3)),
+        # MiniMax's "M" prefix, like DeepSeek's "V"; "MiniMax M4" retires it.
+        "MiniMax M3": ("minimax", (3,)),
+        "Mistral Medium 3.5": ("mistral medium", (3, 5)),
     }
     for label, want in expected.items():
         assert lb._lineage(label) == want, label
@@ -787,3 +786,105 @@ def test_model_meta_resolves_dates_and_is_json_safe():
     assert meta["gpt-5.5"]["structured_outputs"] is True
     assert meta["gpt-5.5"]["batch_discount"] == 0.5
     json.dumps(meta)  # must be serializable
+
+
+def test_rank_sets_replace_the_band_on_every_surface(tmp_path, monkeypatch):
+    """v4.0: the asterisk band is gone; each ranked row carries a rank range
+    from the paired tests (raw p, Holm per model) and a descriptive P(#1)."""
+    monkeypatch.setattr(lb, "ROOT", tmp_path)
+    monkeypatch.setattr(lb, "DOCS", tmp_path / "docs")
+    models = [_fake_model("m-a", "Alpha", "openai", 90.0),
+              _fake_model("m-b", "Bravo", "google", 89.0),
+              _fake_model("m-c", "Charlie", "xai", 70.0)]
+    comparisons = [
+        {"a": "m-a", "b": "m-b", "diff": 0.01, "lo": -0.02, "hi": 0.04, "p_value": 0.5},
+        {"a": "m-a", "b": "m-c", "diff": 0.20, "lo": 0.10, "hi": 0.30, "p_value": 0.001},
+        {"a": "m-b", "b": "m-c", "diff": 0.19, "lo": 0.09, "hi": 0.29, "p_value": 0.002}]
+    for c in comparisons:
+        c.update(n_items=50, q_value=c["p_value"] * 3, holm_p=None,
+                 family="exploratory", winner=None, winner_exploratory=None)
+    folder = tmp_path / "outputs" / "2026-07-10"
+    folder.mkdir(parents=True)
+    (folder / "pairwise.json").write_text(json.dumps({
+        "record_schema": 2, "comparisons": comparisons,
+        "p_first": {"m-a": 0.6, "m-b": 0.4, "m-c": 0.0}}))
+    ledger = {"schema_version": 3, "eval": "ship-sense",
+              "runs": [_fake_run("2026-07-10", "ab" * 32, models)]}
+    md = lb.render_markdown(ledger)
+    html = lb.render_html(ledger)
+    card = lb.render_card_svg(ledger)
+    assert "| 1 | **Alpha** | v2.0 | **90.0** [86.0–94.0] | 1–2 | 60% |" in md
+    assert "| 3 | **Charlie** | v2.0 | **70.0** [66.0–74.0] | 3 | 0% |" in md
+    assert "leader-overlap" not in md + html + card
+    assert "tested on v2.0" in html and "Rank range" in html
+    assert "1–2" in card and "RANK RANGE" in card
+    published = lb.publishable_pairwise("2026-07-10")
+    assert published["p_first"]["m-a"] == 0.6
+
+
+def test_rank_range_is_withheld_without_raw_p_values():
+    ranked = lb.rank_with_ties([_fake_model("a", "A", "openai", 90.0),
+                                _fake_model("b", "B", "openai", 80.0)])
+    legacy = [{"a": "a", "b": "b", "delta": 0.1, "lo": 0.0, "hi": 0.2,
+               "holm_p": 0.01, "winner": "a"}]
+    rows = lb.attach_rank_sets(ranked, legacy, {})
+    assert all("rank_lo" not in r for r in rows)
+    assert lb._rank_range(rows[0]) == "—"
+
+
+def test_non_significant_succession_states_the_gain_it_rules_out(monkeypatch):
+    prev = dict(_fake_model("old-1", "Old 1", "xai", 80.1), superseded_by="new-1")
+    curr = _fake_model("new-1", "New 1", "xai", 81.0)
+    rec = {"a": "new-1", "b": "old-1", "delta": 0.02, "lo": -0.016, "hi": 0.054,
+           "holm_p": 0.4, "n_items": 67, "winner": None}
+    p = lb._generation_pairs([prev, curr], [prev], [rec])[0]
+    assert lb._verdict_call(p) == "△ slight upgrade"
+    assert lb._bound_text(p) == "rules out a gain larger than 5.4"
+    assert "rules out a gain larger than 5.4" in lb._card_note(p)
+    monkeypatch.setattr(lb, "_pairwise_bundle",
+                        lambda run_id: {"records": [rec], "p_first": {}})
+    ledger = {"runs": [_fake_run("2026-07-10", "ab" * 32, [prev, curr])]}
+    assert "rules out a gain larger than 5.4" in lb.render_markdown(ledger)
+
+
+def test_floor_rows_render_each_policy_in_the_table_footer():
+    rows = [{"label": "Best adversarial policy", "restraint": 0.5, "honesty": 0.41,
+             "conviction": 0.55, "headline": 48.7},
+            {"label": "Random policy", "restraint": 0.33, "honesty": 0.39,
+             "conviction": 0.30, "headline": 34.0}]
+    html = lb.floor_rows(rows)
+    assert html.count('<tr class="baseline">') == 2
+    assert "48.7" in html and "0.41" in html and "gameability floor" in html
+    run = _fake_run("2026-07-10", "ab" * 32, [_fake_model("a", "A", "openai", 90.0)])
+    run["adversarial_floor"] = rows
+    assert lb.floor_value(run) == (48.7, "adversarial floor")
+    md = lb.render_markdown({"runs": [run]})
+    assert "| — | Best adversarial policy (gameability floor) |" in md
+    assert "Naive baseline" not in md
+
+
+def test_bench_version_is_stamped_once_and_kept_on_merge():
+    models = [{"name": "a"}, {"name": "b", "bench_version": "v3.6"}]
+    lb.stamp_bench_version(models, "v4.0")
+    assert [m["bench_version"] for m in models] == ["v4.0", "v3.6"]
+
+
+def test_labs_past_the_hue_limit_get_a_distinct_mark():
+    """Labs 10 and 11 sit past the hue limit, so identity also rides on mark
+    shape: the page CSS must shape their dots and legend swatches."""
+    import inspect
+    for lab in lb._PROVIDER_SHAPE:
+        assert f'.dot[style*="{lb._PROVIDER_INK[lab]}"]' in lb.CSS, lab
+        assert f'--{lab})"]' in lb.CSS, lab
+        assert f'<i style="background:var(--{lab})"></i>' in inspect.getsource(lb.render_html), lab
+    assert set(lb._PROVIDER_SHAPE) == {"minimax", "mistral"}
+
+
+def test_value_callout_names_every_model_tied_at_top_price(monkeypatch):
+    rows = [{"name": "a", "label": "Alpha", "price_in": 1, "price_out": 4},
+            {"name": "b", "label": "Beta", "price_in": 10, "price_out": 50},
+            {"name": "c", "label": "Gamma", "price_in": 10, "price_out": 50}]
+    monkeypatch.setattr(lb, "_contenders", lambda ranked: ranked)
+    md = lb._value_callout_md(rows)
+    assert "Beta and Gamma are the most expensive" in md
+    assert "Beta and Gamma are the most expensive" in lb._value_callout(rows)

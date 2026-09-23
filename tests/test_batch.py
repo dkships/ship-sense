@@ -347,3 +347,40 @@ def test_gemini_client_timeout_is_milliseconds(monkeypatch):
     http_options = batch._gemini_client()._api_client._http_options
 
     assert http_options.timeout == int(batch.BATCH_HTTP_TIMEOUT_S * 1000)
+
+
+# --- Mistral dialect (2026-09-22) ------------------------------------------------
+MISTRAL_CFG = {"name": "m", "provider": "mistral", "id": "mistral-medium-3-5",
+               "price_in": 1.5, "price_out": 7.5, "batch_supported": True,
+               "batch_discount": 0.5, "structured_outputs": True}
+
+
+def test_mistral_request_matches_live_chat_body():
+    msgs = [{"role": "system", "content": "sys"}, {"role": "user", "content": "u"}]
+    item = {"id": "example_restraint", "type": "restraint",
+            "features": [{"id": "a", "label": "A"}]}
+    req = batch.provider_request("cid-000001", MISTRAL_CFG, msgs, "restraint", item, 8192)
+    assert req["custom_id"] == "cid-000001"
+    body = req["body"]
+    assert "model" not in body            # set once per job
+    assert body["messages"][0] == {"role": "system", "content": "sys"}
+    assert body["max_tokens"] == 8192
+    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["json_schema"]["strict"] is True
+    assert not {"temperature", "top_p", "reasoning_effort"} & set(body)
+
+
+def test_mistral_result_line_success_and_error():
+    ok = {"custom_id": "c1", "response": {"status_code": 200, "body": {
+        "id": "r1", "model": "mistral-medium-3-5",
+        "choices": [{"message": {"content": "{\"x\": 1}"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1000000, "completion_tokens": 1000000,
+                  "total_tokens": 2000000}}}, "error": None}
+    cid, res = batch._result_from_line("mistral", MISTRAL_CFG, ok)
+    assert cid == "c1" and res.text == "{\"x\": 1}" and res.finish_reason == "stop"
+    assert res.run_mode == "batch" and res.error is None
+    assert abs(res.cost_usd - (1.5 + 7.5) * 0.5) < 1e-9
+    bad = {"custom_id": "c2", "response": {"status_code": 400, "body": {"message": "x"}},
+           "error": None}
+    cid, res = batch._result_from_line("mistral", MISTRAL_CFG, bad)
+    assert cid == "c2" and res.error and res.text == ""
