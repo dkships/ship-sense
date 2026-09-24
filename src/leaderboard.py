@@ -737,14 +737,28 @@ def _all_gen_pairs(runs: list[dict], models: list[dict], previous: list[dict],
 
 
 def _prior_gen_pairs(runs: list[dict]) -> list[dict]:
-    """Successions from the most recent snapshot of the previous bench version,
-    built from that snapshot's own models and its own published records, with
-    its verdicts exactly as published there (its Holm family, not today's).
-    A pair with no published record is dropped: an earlier-bench row without
-    its paired test says nothing the current board can use."""
-    run = _previous_snapshot(runs)
-    if run is None:
-        return []
+    """Successions measured on earlier bench versions, newest bench first.
+
+    Each earlier version contributes its most recent snapshot, built from that
+    snapshot's own models and its own published records, with its verdicts
+    exactly as published there (its Holm family, not today's). A pair shows
+    once, from the newest bench that measured it. A pair with no published
+    record is dropped: an earlier-bench row without its paired test says
+    nothing the current board can use."""
+    pairs: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for run in _previous_snapshots(runs):
+        for p in _snapshot_gen_pairs(run):
+            key = (p["prev"]["name"], p["curr"]["name"])
+            if key in seen:
+                continue
+            seen.add(key)
+            pairs.append(p)
+    return pairs
+
+
+def _snapshot_gen_pairs(run: dict) -> list[dict]:
+    """One earlier snapshot's paired successions, labelled with its bench."""
     records = _snapshot_records(run)
     if not records:
         return []
@@ -759,15 +773,27 @@ def _prior_gen_pairs(runs: list[dict]) -> list[dict]:
             if p["delta"] is not None]
 
 
+def _previous_snapshots(runs: list[dict]) -> list[dict]:
+    """The newest run of each bench version older than the latest run's,
+    newest version first."""
+    if not runs:
+        return []
+    latest = runs[-1].get("version")
+    out: list[dict] = []
+    versions: set[str] = {latest}
+    for run in reversed(runs[:-1]):
+        version = run.get("version")
+        if not version or version in versions:
+            continue
+        versions.add(version)
+        out.append(run)
+    return out
+
+
 def _previous_snapshot(runs: list[dict]) -> dict | None:
     """The newest run on a different bench version than the latest run."""
-    if not runs:
-        return None
-    latest = runs[-1].get("version")
-    for run in reversed(runs[:-1]):
-        if run.get("version") and run.get("version") != latest:
-            return run
-    return None
+    snapshots = _previous_snapshots(runs)
+    return snapshots[0] if snapshots else None
 
 
 def _snapshot_records(run: dict) -> list[dict] | None:

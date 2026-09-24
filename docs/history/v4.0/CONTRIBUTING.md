@@ -1,6 +1,6 @@
 # Contributing
 
-Ship Sense v4.1 is the current bench; earlier boards are preserved under `docs/history/`. Read [RELEASES.md](RELEASES.md), [CORRECTIONS.md](CORRECTIONS.md), [METHODOLOGY.md](METHODOLOGY.md), and the nearest `AGENTS.md` before changing scores or publishing results.
+Ship Sense v4.0 is the current bench; earlier boards are preserved under `docs/history/`. Read [RELEASES.md](../../../RELEASES.md), [CORRECTIONS.md](../../../CORRECTIONS.md), [METHODOLOGY.md](METHODOLOGY.md), and the nearest `AGENTS.md` before changing scores or publishing results.
 
 Run `make install`, `make test`, and `make sample` for the public scaffold. Public examples are synthetic. Real cases, keys, provenance, reviews, raw answers, traces, and private notes must remain gitignored and untracked. Never weaken `.gitignore` to publish a private artifact.
 
