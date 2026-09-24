@@ -1003,3 +1003,23 @@ def test_value_callout_names_every_model_tied_at_top_price(monkeypatch):
     md = lb._value_callout_md(rows)
     assert "Beta and Gamma are the most expensive" in md
     assert "Beta and Gamma are the most expensive" in lb._value_callout(rows)
+
+
+def test_every_earlier_bench_keeps_its_successions(tmp_path, monkeypatch):
+    """Two benches back still count: when the newest bench measures none of
+    the older pairs, each is shown from the newest bench that measured it."""
+    _write_bench_records(tmp_path, monkeypatch)
+    ledger = _two_bench_ledger()
+    v2_hist = tmp_path / "docs" / "history" / "v2.0" / "docs"
+    v2_hist.mkdir(parents=True)
+    (v2_hist / "pairwise.json").write_text(
+        (tmp_path / "docs" / "pairwise.json").read_text())
+    third = copy.deepcopy(ledger["runs"][-1])
+    third.update(run_id="2026-03-01", version="v3.0", run_date="2026-03-01")
+    current, _ = lb.split_generations(third["models"])
+    third["models"] = current
+    ledger["runs"].append(third)
+    benches = {(p["prev"]["name"], p["curr"]["name"]): p["bench"]
+               for p in lb._prior_gen_pairs(ledger["runs"])}
+    assert benches.get(("alpha-1", "alpha-2")) == "v1.0"
+    assert benches.get(("beta-1", "beta-2")) == "v2.0"
