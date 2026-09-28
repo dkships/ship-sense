@@ -160,6 +160,22 @@ models:
     batch_discount: 0.5
     price_verified: "2026-08-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-sonnet-5-5
+    provider: anthropic
+    id: claude-sonnet-5-5
+    label: "Claude Sonnet 5.5"      # spaced so `_lineage` reads version 5.5 and retires "Claude Sonnet 5"
+    released: "2026-09-28"       # anthropic.com/claude-sonnet-5-5 and the model page both say
+                                 # September 28, 2026; Models API created_at 2026-09-28 (same day).
+    price_in: 2                  # same $2/$10 slot as Sonnet 5; cache read $0.20 (standard 0.1x).
+    price_out: 10                # Shipped defaults on the Claude API: adaptive thinking ON
+                                 # (lowest setting `between_tools`), effort `high` (apps use medium).
+                                 # Non-default temperature/top_p/top_k return 400.
+    api: messages
+    structured_outputs: true
+    batch_supported: true        # probed against the Batch API 2026-09-28, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-09-28"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-sonnet-5
     provider: anthropic
     id: claude-sonnet-5

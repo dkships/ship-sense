@@ -12,7 +12,7 @@ Five of the six new v4.1 cases come from one product team, so the AI-product sli
 
 ## 2. Test the v4.1 changes out of sample
 
-The v4.1 retirements and key corrections were decided while reading the v4.0 answers of the same 21 models they were then scored on, so the reliability they add is in-sample. The first models added to the board after v4.1 did not inform the review. If the gain is real, it should hold on them; report it either way.
+The v4.1 retirements and key corrections were decided while reading the v4.0 answers of the same 21 models they were then scored on, so the reliability they add is in-sample. The first models added to the board after v4.1 did not inform the review. If the gain is real, it should hold on them; report it either way. Claude Sonnet 5.5 (September 28) is the first; reliability is a property of the whole set of models, so one addition is not yet a test.
 
 ## 3. Conviction reliability
 
