@@ -1023,3 +1023,36 @@ def test_every_earlier_bench_keeps_its_successions(tmp_path, monkeypatch):
                for p in lb._prior_gen_pairs(ledger["runs"])}
     assert benches.get(("alpha-1", "alpha-2")) == "v1.0"
     assert benches.get(("beta-1", "beta-2")) == "v2.0"
+
+
+def test_hero_never_claims_separation_when_top_rank_set_is_wide():
+    # Rank sets are asymmetric (each model is Holm-corrected over its own tests):
+    # the leader can be the only model whose set includes #1 while its own set
+    # still reaches #3. The hero must then show the range, not "separated".
+    from src import leaderboard as lb
+    run = {"bank": {"n_items": 82}, "adversarial_floor": [{"headline": 52.3}]}
+    ranked = [
+        {"label": "A", "provider": "anthropic", "rank": 1, "rank_lo": 1, "rank_hi": 3,
+         "p_first": 0.9, "n_items": 82, "score": {"value": 90.0}},
+        {"label": "B", "provider": "openai", "rank": 2, "rank_lo": 2, "rank_hi": 2,
+         "p_first": 0.1, "n_items": 82, "score": {"value": 85.0}},
+        {"label": "C", "provider": "google", "rank": 3, "rank_lo": 3, "rank_hi": 3,
+         "p_first": 0.0, "n_items": 82, "score": {"value": 80.0}},
+    ]
+    html = lb._hero_focal(run, ranked)
+    assert "Separated from every other model" not in html
+    assert "1–3" in html
+    ranked[0]["rank_hi"] = 1
+    assert "Separated from every other model" in lb._hero_focal(run, ranked)
+
+
+def test_rank_sets_refuse_a_p_first_from_a_different_lineup():
+    # pairwise.json derives its lineup separately; if it ever drifted from the
+    # board's (e.g. a release-blocked successor), P(#1) would be shown for the
+    # wrong set of models. Refuse instead of rendering it.
+    from src import leaderboard as lb
+    ranked = [{"name": n, "rank": i + 1, "ranked_eligible": True}
+              for i, n in enumerate(["a", "b"])]
+    with pytest.raises(ValueError, match="lineup"):
+        lb.attach_rank_sets(ranked, None, {"a": 0.6, "c": 0.4})
+    lb.attach_rank_sets(ranked, None, {"a": 0.6, "b": 0.4})

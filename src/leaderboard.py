@@ -1772,7 +1772,9 @@ def _pairwise_bundle(run_id: str) -> dict:
     data = _read_json(pub)
     if isinstance(data, list):
         return {"records": data or None, "p_first": {}}
-    if isinstance(data, dict):
+    # The published file belongs to one board; since v4.2 it names its run, and a
+    # different run (a mock, an older snapshot) must not inherit its P(#1).
+    if isinstance(data, dict) and data.get("run_id") == run_id:
         return {"records": data.get("records") or None,
                 "p_first": data.get("p_first") or {}}
     return empty
@@ -1805,8 +1807,8 @@ def publishable_pairwise(run_id: str) -> dict | list | None:
         return None
     if not bundle["p_first"] and not any("p_value" in r for r in bundle["records"]):
         return bundle["records"]  # legacy shape, unchanged
-    return {"record_schema": PAIRWISE_RECORD_SCHEMA, "records": bundle["records"],
-            "p_first": bundle["p_first"]}
+    return {"record_schema": PAIRWISE_RECORD_SCHEMA, "run_id": run_id,
+            "records": bundle["records"], "p_first": bundle["p_first"]}
 
 
 def attach_rank_sets(ranked: list[dict], records: list[dict] | None,
@@ -1816,6 +1818,9 @@ def attach_rank_sets(ranked: list[dict], records: list[dict] | None,
     have none, so those boards show no rank range rather than a wrong one."""
     rows = _eligible_rows(ranked)
     names = [r["name"] for r in rows]
+    if p_first and set(p_first) != set(names):
+        raise ValueError("pairwise.json P(#1) lineup differs from the board's current "
+                         f"lineup: {sorted(set(p_first) ^ set(names))}")
     comps = [{"a": r["a"], "b": r["b"], "diff": r["delta"], "p_value": r.get("p_value")}
              for r in records or []]
     lineup = set(names)
@@ -2568,6 +2573,11 @@ def _hero_focal(run: dict, ranked: list[dict]) -> str:
         within = "Top point score"
     elif len(contenders) > 1:
         within = (f"Rank range {_rank_range(top)} &middot; {len(contenders)} models "
+                  f"could be #1 &middot; P(#1) {_p_first_text(top)}")
+    elif top.get("rank_hi") != 1:
+        # Only this model can be #1, yet its own set is wider: rank sets are
+        # Holm-corrected per model, so they need not be symmetric.
+        within = (f"Rank range {_rank_range(top)} &middot; the only model that "
                   f"could be #1 &middot; P(#1) {_p_first_text(top)}")
     else:
         within = "Separated from every other model by the paired tests"

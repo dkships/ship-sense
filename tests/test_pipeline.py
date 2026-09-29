@@ -146,3 +146,24 @@ def test_report_builds_scorecard_and_chart():
     assert "Ship Sense Score" in text and "/ 100" in text
     assert "Limitations" in text and "Single-author keys" in text
     assert png.exists() and png.stat().st_size > 0
+
+
+def test_live_trace_records_max_tokens_sent():
+    """Live lanes archive no request body, so the trace itself must say which
+    output cap was sent; otherwise live-lane settings parity rests on the adapter
+    code at the run's commit alone."""
+    from src import providers
+
+    class _Stub(providers.Provider):
+        cfg = {"provider": "stub", "id": "stub"}
+        def chat_result(self, messages, *, max_tokens=2048, **kw):
+            return providers.ProviderResult(text="{}", provider="stub", model="stub")
+
+    items = loader.load_cases(only_examples=True)
+    conv = next(it for it in items if it["type"] == "conviction")
+    other = next(it for it in items if it["type"] != "conviction")
+    _, traces = run._run_item_with_traces(_Stub(), conv, gens=1, max_tokens=8192)
+    assert traces[0] and all(t.max_tokens == 8192 for t in traces[0].values())
+    _, traces = run._run_item_with_traces(_Stub(), other, gens=1, max_tokens=4096)
+    assert traces[0].max_tokens == 4096
+    assert traces[0].to_json()["max_tokens"] == 4096

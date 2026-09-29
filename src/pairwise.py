@@ -14,8 +14,11 @@ Three things the scorecard does not handle:
 - Multiplicity, by pre-registered family (`hypotheses.yaml`). Successions and
   named vendor claims form the confirmatory family and are Holm-corrected
   among themselves only; every pair is also in the exploratory all-pairs
-  family and carries a Benjamini-Hochberg q-value. A new model therefore
-  cannot withdraw a confirmatory verdict about an unrelated pair.
+  family and carries a Benjamini-Hochberg q-value. Under the legacy
+  `successions: all` rule (v3.6-v4.1) a model that creates a new succession
+  grows that family and can raise registered Holm p-values; from v4.2 the
+  registered successions are a fixed list and any later succession or claim is
+  its own family of one, so no addition can move a registered verdict.
 - Ranking uncertainty. For the current lineup it writes each model's rank
   confidence set (from the paired tests) and a descriptive bootstrap P(#1).
 
@@ -43,6 +46,10 @@ RULE_ALL_SUCCESSIONS = "all"
 RULE_ALL_PAIRS = "all_pairs"
 REASON_SUCCESSION = "succession"
 REASON_CLAIM = "claim"
+# Holm group of a confirmatory hypothesis: the version's registered family, or
+# a family of one for a succession/claim that arose after registration (v4.2).
+GROUP_REGISTERED = "registered"
+GROUP_ADDED = "added"
 CI_INVERTED = "signflip_inversion"
 CI_BOOTSTRAP = "bootstrap_percentile"
 TEST_NAME = "exact_item_signflip_v1"
@@ -101,8 +108,9 @@ def load_families(version: str, path: Path = HYPOTHESES) -> dict:
     block = spec[version] or {}
     confirmatory = block.get(FAMILY_CONFIRMATORY) or {}
     successions = confirmatory.get("successions", RULE_ALL_SUCCESSIONS)
-    if successions != RULE_ALL_SUCCESSIONS:
-        raise ValueError(f"{version}: successions must be {RULE_ALL_SUCCESSIONS!r}")
+    if successions != RULE_ALL_SUCCESSIONS and not _is_succession_list(successions):
+        raise ValueError(f"{version}: successions must be {RULE_ALL_SUCCESSIONS!r} "
+                         "or a list of {prev, curr}")
     claims = confirmatory.get("claims") or []
     for claim in claims:
         if not claim.get("a") or not claim.get("b") or claim["a"] == claim["b"]:
@@ -113,6 +121,12 @@ def load_families(version: str, path: Path = HYPOTHESES) -> dict:
     return {"version": version, "registered": block.get("registered"),
             "note": block.get("note"), "successions": successions,
             "claims": claims, "exploratory": exploratory}
+
+
+def _is_succession_list(value) -> bool:
+    return isinstance(value, list) and all(
+        isinstance(s, dict) and s.get("prev") and s.get("curr") and s["prev"] != s["curr"]
+        for s in value)
 
 
 def _board_rows(names: list[str], scores: dict[str, tuple]) -> list[dict]:
@@ -132,19 +146,31 @@ def confirmatory_pairs(names: list[str], scores: dict[str, tuple],
     Every succession on the board plus each registered claim whose two models
     are both present. A claim naming an absent model is returned as untested."""
     out: dict[frozenset, dict] = {}
-    succ = leaderboard.successions(_board_rows(names, scores))
-    for prev, curr in succ.items():
-        out[frozenset((prev, curr))] = {"reason": REASON_SUCCESSION,
-                                        "curr": curr, "prev": prev}
     untested = []
     present = set(names)
+    rule = family.get("successions", RULE_ALL_SUCCESSIONS)
+    registered = None if rule == RULE_ALL_SUCCESSIONS else {
+        frozenset((s["prev"], s["curr"])) for s in rule}
+    succ = leaderboard.successions(_board_rows(names, scores))
+    for prev, curr in succ.items():
+        key = frozenset((prev, curr))
+        group = (GROUP_REGISTERED if registered is None or key in registered
+                 else f"{GROUP_ADDED}:{prev}->{curr}")
+        out[key] = {"reason": REASON_SUCCESSION, "curr": curr, "prev": prev,
+                    "group": group}
+    for s in [] if registered is None else rule:
+        if frozenset((s["prev"], s["curr"])) not in out:
+            untested.append(s)
     for claim in family["claims"]:
         if claim["a"] not in present or claim["b"] not in present:
             untested.append(claim)
             continue
         key = frozenset((claim["a"], claim["b"]))
+        group = (f"{GROUP_ADDED}:{claim['a']} vs {claim['b']}" if claim.get("added")
+                 else GROUP_REGISTERED)
         hypothesis = {"reason": REASON_CLAIM, "claimant": claim["a"],
-                      "reference": claim["b"], "claim": claim.get("claim", "")}
+                      "reference": claim["b"], "claim": claim.get("claim", ""),
+                      "group": group}
         out[key] = {**out.get(key, {}), **hypothesis}
     return out, untested
 
@@ -204,8 +230,15 @@ def compare(per_model: dict[str, list[dict]], models: list[str],
 def _adjust_families(records: list[dict]) -> None:
     """Attach q-values, confirmatory Holm p-values and both verdicts."""
     q_values = bh_adjust([r["p_value"] for r in records])
-    confirm = [i for i, r in enumerate(records) if r["family"] == FAMILY_CONFIRMATORY]
-    holm = dict(zip(confirm, holm_adjust([records[i]["p_value"] for i in confirm])))
+    groups: dict[str, list[int]] = {}
+    for i, r in enumerate(records):
+        if r["family"] != FAMILY_CONFIRMATORY:
+            continue
+        group = (r.get("hypothesis") or {}).get("group", GROUP_REGISTERED)
+        groups.setdefault(group, []).append(i)
+    holm = {}
+    for members in groups.values():
+        holm.update(zip(members, holm_adjust([records[i]["p_value"] for i in members])))
     for i, r in enumerate(records):
         r["q_value"] = q_values[i]
         r["holm_p"] = holm.get(i)
@@ -307,6 +340,8 @@ def _confirmatory_md(confirm: list[dict], untested: list[dict]) -> list[str]:
         lo, hi = (r["lo"], r["hi"]) if sign > 0 else (-r["hi"], -r["lo"])
         label = (f"{first} vs {second} (succession)" if h["reason"] == REASON_SUCCESSION
                  else f"{first} vs {second} (claim: {h.get('claim', '')})")
+        if h.get("group", GROUP_REGISTERED) != GROUP_REGISTERED:
+            label += ", added after registration: its own family"
         if r["winner"] is None and (lo > 0 or hi < 0):
             verdict = (f"CI excludes zero, not significant after Holm; "
                        f"{gain_bound(r, first)}")
@@ -318,8 +353,9 @@ def _confirmatory_md(confirm: list[dict], untested: list[dict]) -> list[str]:
                      f"[{lo * 100:+.1f}, {hi * 100:+.1f}] | {r['p_value']:.4g} | "
                      f"{r['holm_p']:.4f} | {verdict} |")
     for claim in untested:
-        lines.append(f"| {claim['a']} vs {claim['b']} (claim: {claim.get('claim', '')}) "
-                     "| — | — | — | — | untested: a model is not on this board |")
+        label = (f"{claim['curr']} vs {claim['prev']} (succession)" if "curr" in claim
+                 else f"{claim['a']} vs {claim['b']} (claim: {claim.get('claim', '')})")
+        lines.append(f"| {label} | — | — | — | — | untested: a model is not on this board |")
     lines.append("")
     return lines
 

@@ -504,6 +504,13 @@ def _paired_clusters(a: list[dict], b: list[dict]):
             raise ValueError(f"models disagree on dimension/weight for {(item, sub)!r}")
         shared.append((da, item, sub))
         by_dim_item.setdefault(da, {}).setdefault(item, []).append((wa, ca - cb))
+    # The exact test sums an item's deltas across dimensions while the bootstrap
+    # resamples (dimension, item) clusters; an item in two dimensions would make
+    # the interval and the p-value test different things.
+    seen: dict[str, str] = {}
+    for dim, item, _ in shared:
+        if seen.setdefault(item, dim) != dim:
+            raise ValueError(f"item {item!r} is scored in more than one dimension")
     dims = [d for d in DIMENSIONS if d in by_dim_item]
     dims += sorted(set(by_dim_item) - set(dims))
     clusters = {d: [by_dim_item[d][item] for item in sorted(by_dim_item[d])]

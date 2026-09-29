@@ -1398,7 +1398,7 @@ models:
     batch_supported: true
     batch_discount: 0.5
     price_verified: "2026-09-22"
-    price_source: "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5"
+    price_source: "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04"  # old URL 404s since 2026-09 (re-verified 2026-09-28)
 
   # --- Deterministic, no network. Used by tests + scaffold + the gameability floor. ---
   - name: mock-strong

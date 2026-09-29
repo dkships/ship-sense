@@ -92,6 +92,9 @@ class ProviderResult:
     usage: dict[str, int | float | None] = field(default_factory=dict)
     cost_usd: float | None = None
     structured_output: str | None = None
+    # The output cap the harness sent. Live lanes archive no request body, so the
+    # trace carries it (batch lanes keep the full request in their batch files).
+    max_tokens: int | None = None
     parse_ok: bool | None = None
     error: str | None = None
     # Thinking models' reasoning text, carried only so multi-turn history can
