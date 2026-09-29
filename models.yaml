@@ -311,6 +311,29 @@ models:
     batch_discount: 0.5          # pricing page: batch $1 / $5
     price_verified: "2026-09-22"
     price_source: "https://developers.openai.com/api/docs/pricing"
+  # GPT-6.1 Sol — announced 2026-09-29 (DevDay; openai.com/index/introducing-gpt-6-1-sol).
+  # Listed on /v1/models the same day. Model page: default reasoning.effort
+  # medium (low..max), 1.05M context, 128k max output, structured outputs,
+  # Batch at 50%. Same-line successor of GPT-6 Sol: `_lineage` retires it
+  # ("gpt sol" 6.1 > 6), no superseded_by needed.
+  - name: gpt-6.1-sol
+    provider: openai
+    id: gpt-6.1-sol
+    label: "GPT-6.1 Sol"
+    released: "2026-09-29"
+    price_in: 2
+    price_out: 10
+    price_cached_in: 0.1
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    # Pricing page lists batch $1 / $5 and the model page lists v1/batch, but the
+    # Batch validator rejected the id on launch day (notes/batch_probe.py
+    # 2026-09-29: "not supported by the Batch API"; gpt-6-sol accepted as the
+    # control). Same launch-day gap as GPT-5.6. The API wins; re-probe later.
+    batch_supported: false
+    price_verified: "2026-09-29"
+    price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
     id: gpt-6-luna

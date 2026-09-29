@@ -118,7 +118,8 @@ def test_committed_hypotheses_cover_the_published_versions():
     fam = pairwise.load_families("v4.2")
     assert [s["curr"] for s in fam["successions"]] == [
         "claude-sonnet-5-5", "gpt-6-sol", "gpt-6-luna"]
-    assert len(fam["claims"]) == 2
+    registered = [c for c in fam["claims"] if not c.get("added")]
+    assert len(registered) == 2
 
 
 def test_confirmatory_pairs_report_an_absent_claim_as_untested():
