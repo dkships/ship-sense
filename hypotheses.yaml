@@ -106,4 +106,10 @@ versions:
         - a: gpt-6-luna
           b: gpt-5.6-sol
           claim: '"GPT-6 Luna (max) is able to exceed GPT-5.6 Sol (medium)." (GPT-6 launch; tested at shipped defaults)'
+        # Appended 2026-09-29 while GPT-6.1 Sol's launch-day run was in flight,
+        # before any GPT-6.1 Sol score existed. Its own family of one.
+        - a: gpt-6.1-sol
+          b: gpt-6-astra
+          added: "2026-09-29"
+          claim: '"Nearly matches GPT-6 Astra''s intelligence on agentic coding, computer use, and professional work." (GPT-6.1 Sol launch; tested at shipped defaults)'
     exploratory: all_pairs
