@@ -44,10 +44,17 @@ def _pattern_regex(pattern: str, kind: ClaimKind) -> str:
     return r"(?<!\w)(?:" + pattern + ")" + _ENDING
 
 
+# NFKC maps the non-breaking hyphen U+2011 to U+2010, which is still not "-",
+# so every hyphen and dash variant is mapped explicitly (v4.2 parity fix).
+_TYPOGRAPHY = str.maketrans({"’": "'", "‘": "'", "–": "-", "—": "-", "−": "-",
+                             "\u2010": "-", "\u2012": "-", "\u2015": "-",
+                             "“": '"', "”": '"'})
+_ZERO_WIDTH = re.compile("[\u200b\u200c\u200d\ufeff]")
+
+
 def normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).lower()
-    text = text.translate(str.maketrans({"’": "'", "‘": "'", "–": "-", "—": "-",
-                                       "−": "-", "“": '"', "”": '"'}))
+    text = _ZERO_WIDTH.sub("", text.translate(_TYPOGRAPHY))
     text = re.sub(r"[*_`]", "", text)
     return re.sub(r"\s+", " ", text).strip()
 

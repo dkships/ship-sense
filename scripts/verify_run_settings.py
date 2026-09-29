@@ -11,7 +11,8 @@ proves it for a given run directory instead of assuming it:
 
 Live-lane request bodies are not archived; their behavior is pinned by
 src/providers.py at the run's commit. This script flags which models ran
-live so that code review knows where to look.
+live so that code review knows where to look. Since v4.2 each live trace also
+records the output cap it sent (`max_tokens`), which this script tallies.
 
 Usage: python scripts/verify_run_settings.py <run_id> [<run_id> ...]
 Exit code 1 if any forbidden parameter is found in any batch request.
@@ -49,6 +50,7 @@ def check_run(run_dir: Path) -> bool:
                     ceilings[(model, key, val)] += 1
 
     modes: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    live_caps: collections.Counter = collections.Counter()
     for trace_file in sorted(run_dir.glob("traces/*.json")):
         model = trace_file.name.split("__")[0]
         entries = json.loads(trace_file.read_text())
@@ -56,6 +58,9 @@ def check_run(run_dir: Path) -> bool:
             mode = entry.get("run_mode")
             if mode:
                 modes[model][mode] += 1
+            for call in _calls(entry):
+                if call.get("run_mode") == "live":
+                    live_caps[(model, call.get("max_tokens"))] += 1
 
     print(f"== {run_dir.name}")
     if hits:
@@ -66,12 +71,26 @@ def check_run(run_dir: Path) -> bool:
         print("  ok: no sampler/reasoning params in any archived batch request")
     for (model, key, val), n in sorted(ceilings.items()):
         print(f"  {model}: {key}={val} ({n} requests)")
+    for (model, cap), n in sorted(live_caps.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
+        shown = cap if cap is not None else "not recorded (pre-v4.2 trace)"
+        print(f"  {model}: live max_tokens={shown} ({n} calls)")
     for model, counter in sorted(modes.items()):
         tag = " <== MIXED MODES" if len(counter) > 1 else ""
         live = " (live: params pinned by src/providers.py at this run's commit)" \
             if "live" in counter else ""
         print(f"  {model}: {dict(counter)}{tag}{live}")
     return ok
+
+
+def _calls(entry):
+    """Every provider call in a trace entry (conviction entries nest per turn)."""
+    if not isinstance(entry, dict):
+        return
+    if "run_mode" in entry:
+        yield entry
+        return
+    for value in entry.values():
+        yield from _calls(value)
 
 
 def _find_key(obj, key):

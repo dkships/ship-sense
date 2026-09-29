@@ -115,6 +115,10 @@ def test_committed_hypotheses_cover_the_published_versions():
         fam = pairwise.load_families(version)
         assert fam["successions"] == "all"
         assert fam["claims"]
+    fam = pairwise.load_families("v4.2")
+    assert [s["curr"] for s in fam["successions"]] == [
+        "claude-sonnet-5-5", "gpt-6-sol", "gpt-6-luna"]
+    assert len(fam["claims"]) == 2
 
 
 def test_confirmatory_pairs_report_an_absent_claim_as_untested():
@@ -130,3 +134,60 @@ def test_gain_bound_reads_the_upper_end_for_the_named_model():
     rec = {"a": "new", "b": "old", "lo": -0.02, "hi": 0.058}
     assert pairwise.gain_bound(rec, "new") == "rules out a gain larger than 5.8"
     assert pairwise.gain_bound(rec, "old") == "rules out a gain larger than 2.0"
+
+
+# --- v4.2: a frozen confirmatory family ------------------------------------------
+# Under `successions: all` a model added after registration that creates a new
+# succession grows the Holm family and raises every smaller registered p-value
+# (Claude Sonnet 5.5 moved the GPT-6 Luna claim from 2.0e-5 to 2.5e-5 on v4.1).
+# From v4.2 the registered successions are a fixed list; a later succession or
+# claim is its own family of one, so no addition can move a registered verdict.
+
+def test_load_families_accepts_a_frozen_succession_list(tmp_path):
+    path = tmp_path / "h.yaml"
+    path.write_text("versions:\n  v9:\n    confirmatory:\n      successions:\n"
+                    "        - {prev: old, curr: new}\n      claims: []\n"
+                    "    exploratory: all_pairs\n")
+    fam = pairwise.load_families("v9", path)
+    assert fam["successions"] == [{"prev": "old", "curr": "new"}]
+
+
+def test_late_succession_is_its_own_family(monkeypatch):
+    monkeypatch.setattr(pairwise.leaderboard, "successions",
+                        lambda rows: {"old": "new", "old2": "new2"})
+    scores = {n: (80.0, 0, 0) for n in ("old", "new", "old2", "new2")}
+    family = {"successions": [{"prev": "old", "curr": "new"},
+                              {"prev": "gone", "curr": "new"}],
+              "claims": [{"a": "new", "b": "old2", "claim": "x"},
+                         {"a": "new2", "b": "old", "claim": "y", "added": "2026-10-01"}]}
+    pairs, untested = pairwise.confirmatory_pairs(list(scores), scores, family)
+    assert pairs[frozenset(("old", "new"))]["group"] == pairwise.GROUP_REGISTERED
+    assert pairs[frozenset(("new", "old2"))]["group"] == pairwise.GROUP_REGISTERED
+    assert pairs[frozenset(("old2", "new2"))]["group"] == "added:old2->new2"
+    assert pairs[frozenset(("new2", "old"))]["group"] == "added:new2 vs old"
+    assert [u.get("prev") for u in untested] == ["gone"]
+
+
+def test_legacy_all_rule_keeps_one_family(monkeypatch):
+    monkeypatch.setattr(pairwise.leaderboard, "successions", lambda rows: {"old": "new"})
+    scores = {n: (80.0, 0, 0) for n in ("old", "new")}
+    pairs, _ = pairwise.confirmatory_pairs(list(scores), scores,
+                                           {"successions": "all", "claims": []})
+    assert pairs[frozenset(("old", "new"))]["group"] == pairwise.GROUP_REGISTERED
+
+
+def test_late_addition_cannot_move_a_registered_holm_p():
+    # Two registered pairs and one late succession with a larger p-value: the
+    # registered Holm p-values must equal Holm over the registered pairs alone.
+    per = {"a": _model([1] * 12 + [0] * 8), "b": _model([0] * 20),
+           "c": _model([1] * 10 + [0] * 10), "d": _model([0] * 20),
+           "e": _model([1] * 6 + [0] * 14), "f": _model([0] * 20)}
+    reg = pairwise.GROUP_REGISTERED
+    confirm = {frozenset(("a", "b")): {"reason": "claim", "group": reg},
+               frozenset(("c", "d")): {"reason": "claim", "group": reg},
+               frozenset(("e", "f")): {"reason": "succession", "group": "added:f->e"}}
+    recs = pairwise.compare(per, list(per), n=200, seed=0, confirmatory=confirm)
+    get = lambda x, y: next(r for r in recs if {r["a"], r["b"]} == {x, y})
+    alone = pairwise.holm_adjust([get("a", "b")["p_value"], get("c", "d")["p_value"]])
+    assert [get("a", "b")["holm_p"], get("c", "d")["holm_p"]] == pytest.approx(alone)
+    assert get("e", "f")["holm_p"] == pytest.approx(get("e", "f")["p_value"])

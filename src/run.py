@@ -100,6 +100,7 @@ def _run_item_with_traces(provider: providers.Provider, item: dict, gens: int,
             setup = provider.chat_result(msgs, item=item, turn={"id": "setup"},
                                          schema="conviction", run_mode=run_mode,
                                          max_tokens=max_tokens)
+            setup.max_tokens = max_tokens
             raw = {"setup": setup.text}
             trace = {"setup": setup}
             msgs.append(_assistant_msg(setup))
@@ -108,6 +109,7 @@ def _run_item_with_traces(provider: providers.Provider, item: dict, gens: int,
                 resp = provider.chat_result(msgs, item=item, turn=turn,
                                             schema="conviction", run_mode=run_mode,
                                             max_tokens=max_tokens)
+                resp.max_tokens = max_tokens
                 raw[turn["id"]] = resp.text
                 trace[turn["id"]] = resp
                 msgs.append(_assistant_msg(resp))
@@ -118,6 +120,7 @@ def _run_item_with_traces(provider: providers.Provider, item: dict, gens: int,
                     {"role": "user", "content": _user_prompt(item)}]
             resp = provider.chat_result(msgs, item=item, schema=item["type"],
                                         run_mode=run_mode, max_tokens=max_tokens)
+            resp.max_tokens = max_tokens
             outs.append(resp.text)
             traces.append(resp)
     return outs, traces

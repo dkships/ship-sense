@@ -1,7 +1,7 @@
 # Ship Sense
 
 [![tests](https://github.com/dkships/ship-sense/actions/workflows/test.yml/badge.svg)](https://github.com/dkships/ship-sense/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../../LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Leaderboard](https://img.shields.io/badge/leaderboard-live-0a7a52.svg)](#leaderboard)
 

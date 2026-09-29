@@ -297,3 +297,14 @@ def test_reliability_reports_alpha_and_generation_split_half():
 
 def test_mde_is_the_80_percent_power_multiple_of_the_se():
     assert stats.mde(1.0) == pytest.approx(1.959964 + 0.841621, rel=1e-5)
+
+
+def test_paired_tests_refuse_an_item_in_two_dimensions():
+    # The exact test sums an item's contributions across dimensions while the
+    # bootstrap treats (dimension, item) as its cluster; an item scored in two
+    # dimensions would make the CI and the p-value disagree. Refuse it loudly.
+    rows = lambda c: [{"item": "i0", "dimension": "restraint", "sub": "s", "correct": c, "weight": 1.0},
+                      {"item": "i0", "dimension": "honesty", "sub": "t", "correct": c, "weight": 1.0},
+                      {"item": "i1", "dimension": "restraint", "sub": "s", "correct": c, "weight": 1.0}]
+    with pytest.raises(ValueError, match="more than one dimension"):
+        stats.paired_exact_p(rows(True), rows(False))
