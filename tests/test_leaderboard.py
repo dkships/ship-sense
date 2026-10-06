@@ -419,6 +419,23 @@ def test_split_generations_reads_the_registry_for_renamed_lines():
     assert [m["name"] for m in current] == ["gpt-5.6-sol"]
 
 
+def test_replaced_by_retires_without_a_generation_pair():
+    # A lab's new flagship in a different tier (Mistral Large 4 over Medium 3.5)
+    # takes the slot: the old model leaves the current board, but no
+    # succession forms, so no generation pair and no confirmatory test.
+    old = dict(_fake_model("medium-3", "Examplecorp Medium 3", "mistral", 80.0),
+               replaced_by="large-4")
+    new = _fake_model("large-4", "Examplecorp Large 4", "mistral", 82.0)
+    current, previous = lb.split_generations([old, new])
+    assert [m["name"] for m in previous] == ["medium-3"]
+    assert [m["name"] for m in current] == ["large-4"]
+    assert lb.successions([old, new]) == {}
+    assert lb._generation_pairs([old, new], previous, []) == []
+    # An unranked replacement keeps the old model current.
+    provisional = dict(new, ranked_eligible=False)
+    assert lb.split_generations([old, provisional])[1] == []
+
+
 def test_lineage_parses_versions_and_families():
     assert lb._lineage("Claude Sonnet 4.6") == ("claude sonnet", (4, 6))
     assert lb._lineage("Claude Sonnet 5") == ("claude sonnet", (5,))

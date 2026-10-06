@@ -34,6 +34,8 @@ from collections import Counter
 from html import escape
 from pathlib import Path
 
+import yaml
+
 from . import loader, report, stats
 from .report import (DIMENSIONS, LIMITATIONS, RESOLUTION_GUIDE_PP, _is_baseline,
                      summarize)
@@ -373,6 +375,7 @@ def build_snapshot(run_id: str, per_model: dict[str, list[dict]],
             "price_verified": m.get("price_verified"),
             "price_source": m.get("price_source"),
             "superseded_by": m.get("superseded_by"),
+            "replaced_by": m.get("replaced_by"),
             "is_baseline": baseline,
             "ranked_eligible": ranked_eligible,
             "coverage_status": (
@@ -657,13 +660,43 @@ def successions(models: list[dict]) -> dict[str, str]:
     return out
 
 
+def replacements(models: list[dict]) -> dict[str, str]:
+    """Replaced model name -> the ranked model that took its lab slot.
+
+    `replaced_by` (ledger row, else registry) is for a lab whose new flagship
+    sits in a different tier: Mistral Large 4 replaced Mistral Medium 3.5 as
+    Mistral's scored model (David's ruling, 2026-10-06). The replaced model
+    leaves the current board like a superseded one, but it is NOT a succession:
+    no generation pair, no confirmatory test, because a different tier is not
+    a previous version. Same ranked-only rule as successions()."""
+    # Read straight from models.yaml, not loader.model_meta(): loader.py is
+    # fingerprinted by scorer_hash(), and a display-only field must not
+    # invalidate every run's bank manifest.
+    try:
+        registry = {m["name"]: m for m in
+                    (yaml.safe_load(loader.MODELS_FILE.read_text()) or {})
+                    .get("models", [])}
+    except (FileNotFoundError, yaml.YAMLError):
+        registry = {}
+    ranked = {m["name"] for m in models
+              if not m.get("is_baseline") and m.get("ranked_eligible", True)}
+    out: dict[str, str] = {}
+    for m in models:
+        by = (m.get("replaced_by")
+              or (registry.get(m["name"]) or {}).get("replaced_by"))
+        if by in ranked and by != m["name"]:
+            out[m["name"]] = by
+    return out
+
+
 def split_generations(models: list[dict]) -> tuple[list[dict], list[dict]]:
     """(current, previous) board composition for one run's models.
 
-    `previous` is every model with a ranked successor per successions();
-    everything else — baselines included — is current. Display-only: scores,
-    the ledger, and the run history are untouched."""
-    succ = successions(models)
+    `previous` is every model with a ranked successor per successions() or a
+    ranked replacement per replacements(); everything else — baselines
+    included — is current. Display-only: scores, the ledger, and the run
+    history are untouched."""
+    succ = {**replacements(models), **successions(models)}
     previous = sorted((m for m in models if m["name"] in succ),
                       key=lambda m: -m["score"]["value"])
     prev_names = {m["name"] for m in previous}
@@ -684,7 +717,7 @@ def _generation_pairs(models: list[dict], previous: list[dict],
     succ = successions(models)
     pairs = []
     for prev in previous:
-        curr = by_name.get(succ[prev["name"]])
+        curr = by_name.get(succ.get(prev["name"]))  # replaced models have no pair
         if curr is None:
             continue
         rec, sign = by_pair.get((curr["name"], prev["name"])), 1.0
@@ -2629,12 +2662,21 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
     limitations = "".join(f"<li>{_md_inline(x)}</li>" for x in LIMITATIONS)
     history = _history_rows(runs)
     gens_board_note = ""
-    if previous:
-        names = ", ".join(escape(m["label"]) for m in previous)
+    replaced = replacements(models)
+    superseded = [m for m in previous if m["name"] not in replaced]
+    if superseded:
+        names = ", ".join(escape(m["label"]) for m in superseded)
         gens_board_note = (f' This board is each lab&rsquo;s current lineup; '
-                           f'{len(previous)} superseded predecessor'
-                           f'{"s" if len(previous) != 1 else ""} ({names}) '
+                           f'{len(superseded)} superseded predecessor'
+                           f'{"s" if len(superseded) != 1 else ""} ({names}) '
                            f'moved to <a href="#generations">Generations</a>.')
+    by_name = {m["name"]: m for m in models}
+    for m in previous:
+        if m["name"] in replaced:
+            gens_board_note += (f' {escape(m["label"])} left the board when '
+                                f'{escape(by_name[replaced[m["name"]]]["label"])} '
+                                f'took its lab&rsquo;s slot; a different tier, so '
+                                f'not compared as a generation.')
     repriced_note = ""
     moved = _repriced_pairs(models)
     if moved:
