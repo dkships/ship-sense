@@ -384,3 +384,45 @@ def test_mistral_result_line_success_and_error():
            "error": None}
     cid, res = batch._result_from_line("mistral", MISTRAL_CFG, bad)
     assert cid == "c2" and res.error and res.text == ""
+
+
+# --- Effort probe (2026-10-06) ---------------------------------------------------
+# Board runs never set effort. The probe sets it explicitly and only through
+# `prepare(effort=...)`, so the default request body must stay byte-identical.
+ANTHROPIC_CFG = {"name": "a", "provider": "anthropic", "id": "claude-sonnet-5-5",
+                 "structured_outputs": True}
+OPENAI_CFG = {"name": "o", "provider": "openai", "id": "gpt-6-sol",
+              "structured_outputs": True}
+PROBE_ITEM = {"id": "example_restraint", "type": "restraint",
+              "features": [{"id": "a", "label": "A"}]}
+PROBE_MSGS = [{"role": "system", "content": "sys"}, {"role": "user", "content": "u"}]
+
+
+def test_default_requests_carry_no_effort():
+    a = batch.provider_request("c", ANTHROPIC_CFG, PROBE_MSGS, "restraint", PROBE_ITEM, 8192)
+    o = batch.provider_request("c", OPENAI_CFG, PROBE_MSGS, "restraint", PROBE_ITEM, 8192)
+    assert set(a["params"]["output_config"]) == {"format"}
+    assert "reasoning" not in o["body"]
+
+
+def test_anthropic_effort_sits_beside_the_schema():
+    req = batch.provider_request("c", ANTHROPIC_CFG, PROBE_MSGS, "restraint",
+                                 PROBE_ITEM, 8192, effort="low")
+    config = req["params"]["output_config"]
+    assert config["effort"] == "low"
+    assert config["format"]["type"] == "json_schema"
+
+
+def test_openai_effort_is_reasoning_effort():
+    req = batch.provider_request("c", OPENAI_CFG, PROBE_MSGS, "restraint",
+                                 PROBE_ITEM, 8192, effort="high")
+    assert req["body"]["reasoning"] == {"effort": "high"}
+
+
+def test_effort_rejected_where_no_adapter_maps_it():
+    with pytest.raises(ValueError):
+        batch.provider_request("c", MISTRAL_CFG, PROBE_MSGS, "restraint",
+                               PROBE_ITEM, 8192, effort="low")
+    with pytest.raises(ValueError):
+        batch.provider_request("c", ANTHROPIC_CFG, PROBE_MSGS, "restraint",
+                               PROBE_ITEM, 8192, effort="turbo")
