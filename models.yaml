@@ -1402,8 +1402,11 @@ models:
     price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
 
   # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
-  # The flagship: docs.mistral.ai models overview calls it "frontier-class";
-  # no Large line is listed on /v1/models any more. Every medium id on the
+  # The flagship: docs.mistral.ai models overview calls it "frontier-class".
+  # Mistral Large 3 (mistral-large-2512, Dec 2025, MoE 675B/41B active) IS on
+  # /v1/models (re-checked 2026-09-29; an earlier note here said it was not),
+  # but Medium 3.5 is newer and the one Mistral recommends for hard work, so it
+  # stays the scored model. Every medium id on the
   # account (mistral-medium-3-5 / -3.5 / -2604 / -latest) aliases one model;
   # pin the concrete id. Released 2026-04-28 (docs model card), $1.5/$7.5.
   # Batch: Mistral's own Batch API (/v1/files purpose=batch + /v1/batch/jobs),
@@ -1422,6 +1425,33 @@ models:
     batch_discount: 0.5
     price_verified: "2026-09-22"
     price_source: "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04"  # old URL 404s since 2026-09 (re-verified 2026-09-28)
+    # Mistral Large 4 took Mistral's slot on 2026-10-06. Different tier, so this
+    # is a replacement, not a succession: no generation pair (David's ruling).
+    replaced_by: mistral-large-4
+
+  # Mistral Large 4 ("ML4") — Mistral's frontier model and now its scored one,
+  # added launch-day 2026-10-06 (David: for the smaller frontier labs the board
+  # carries only the frontier model). PUBLIC PREVIEW: mistral.ai/news/mistral-large-4
+  # ("try the preview API today"; weights due end of October). 1T-param MoE,
+  # 49B active, hybrid instruct/reasoning. On /v1/models as mistral-large-4
+  # (alias mistral-large-4-0; checked 2026-10-06). Shipped default answered a
+  # trivial prompt in 6 tokens, no reasoning trace; no param set, per policy.
+  # Strict json_schema accepted (live probe 2026-10-06). Batch probed the same
+  # day: job created and SUCCESS, Medium 3.5 as control. Preview pricing may move.
+  - name: mistral-large-4
+    provider: mistral
+    id: mistral-large-4
+    base_url: https://api.mistral.ai/v1
+    label: "Mistral Large 4"
+    released: "2026-10-06"       # mistral.ai/news/mistral-large-4 (public preview)
+    price_in: 1.36
+    price_out: 4.18
+    api: chat_completions
+    structured_outputs: true     # strict json_schema accepted (probe 2026-10-06)
+    batch_supported: true
+    batch_discount: 0.5
+    price_verified: "2026-10-06"
+    price_source: "https://mistral.ai/news/mistral-large-4"
 
   # --- Deterministic, no network. Used by tests + scaffold + the gameability floor. ---
   - name: mock-strong
