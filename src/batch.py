@@ -421,7 +421,9 @@ def prepare(model_names: list[str], run_id: str, *,
         if cfg["provider"] == "mock" or not cfg.get("batch_supported"):
             continue
         gens = generations or defaults.get("generations", 1)
-        token_cap = max_tokens or defaults.get("max_tokens", 2048)
+        # Same precedence as the live path (run.py): explicit override, then the
+        # model's registry ceiling, then the global default.
+        token_cap = max_tokens or int(cfg.get("max_tokens", defaults.get("max_tokens", 2048)))
         rows: list[dict] = []
         records: list[dict] = []
         seen_ids: set[str] = set()
@@ -590,6 +592,27 @@ def _result_from_line(provider: str, cfg: dict, line: dict) -> tuple[str, provid
     raise ValueError(f"unknown provider {provider!r}")
 
 
+def _mistral_content(content: Any) -> tuple[str, str | None]:
+    """Split Mistral message content into (answer text, reasoning text).
+
+    Content is usually a string, but a reasoning model can return typed chunks:
+    a "thinking" chunk (its own list of text chunks) followed by a "text" chunk.
+    Only text chunks are the answer; thinking is kept as reasoning, not graded."""
+    if isinstance(content, str) or content is None:
+        return content or "", None
+    answer, reasoning = [], []
+    for chunk in content:
+        if not isinstance(chunk, dict):
+            continue
+        if chunk.get("type") == "thinking":
+            reasoning.extend(t.get("text", "") for t in chunk.get("thinking") or []
+                             if isinstance(t, dict))
+            continue
+        if chunk.get("type") == "text":
+            answer.append(chunk.get("text") or "")
+    return "".join(answer), ("".join(reasoning) or None)
+
+
 def _mistral_result(cfg: dict, line: dict) -> tuple[str, providers.ProviderResult]:
     """One Mistral batch output line: {custom_id, response: {status_code, body},
     error}. `body` is an ordinary chat completion."""
@@ -604,8 +627,10 @@ def _mistral_result(cfg: dict, line: dict) -> tuple[str, providers.ProviderResul
         )
     choice = body["choices"][0]
     usage = providers.normalize_usage(body.get("usage"))
+    text, reasoning = _mistral_content((choice.get("message") or {}).get("content"))
     return cid, providers.ProviderResult(
-        text=(choice.get("message") or {}).get("content") or "",
+        text=text,
+        reasoning_content=reasoning,
         provider="mistral",
         model=body.get("model") or cfg["id"],
         run_mode="batch",

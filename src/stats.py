@@ -26,8 +26,11 @@ MDE_POWER = 0.80
 CREDIT_DENOMINATOR_LIMIT = 64
 
 # Memory guard for the exact sign-flip distribution: one float64 per lattice
-# point, so 10M points is 80 MB. The v3.6 board's widest pair is 1.1M.
-MAX_LATTICE_WIDTH = 10_000_000
+# point, so 50M points is 400 MB (about twice that at peak, with the working copy).
+# The v3.6 board's widest pair is 1.1M; on v4.3 (93 items, finer check weights)
+# the widest is 28.1M and takes about 5 s. Raised from 10M on 2026-10-07; the
+# p-value computed is unchanged, the guard only refuses to compute it.
+MAX_LATTICE_WIDTH = 50_000_000
 
 # Test inversion runs the sign-flip test at shifted nulls. A shifted item
 # contribution is no longer on the exact rational lattice, so it is rounded

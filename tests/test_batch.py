@@ -426,3 +426,41 @@ def test_effort_rejected_where_no_adapter_maps_it():
     with pytest.raises(ValueError):
         batch.provider_request("c", ANTHROPIC_CFG, PROBE_MSGS, "restraint",
                                PROBE_ITEM, 8192, effort="turbo")
+
+
+def test_mistral_result_reads_text_block_from_content_list():
+    """Mistral can return `content` as typed chunks (a thinking chunk, then a text
+    chunk) instead of a string. Seen on mistral-large-4 batch output 2026-10-07:
+    reading the list as text left every answer unparseable and the staged driver
+    re-submitted the same requests. Only text chunks are the answer."""
+    content = [
+        {"type": "thinking", "thinking": [{"type": "text", "text": "reasoning..."}],
+         "signature": None, "closed": True},
+        {"type": "text", "text": "{\"x\": 1}"},
+    ]
+    line = {"custom_id": "c1", "response": {"status_code": 200, "body": {
+        "id": "r1", "model": "mistral-large-4",
+        "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}}},
+        "error": None}
+    cid, res = batch._result_from_line("mistral", MISTRAL_CFG, line)
+    assert cid == "c1"
+    assert res.text == "{\"x\": 1}"
+    assert res.reasoning_content == "reasoning..."
+
+
+def test_prepare_honours_registry_max_tokens(monkeypatch):
+    """A per-model `max_tokens` in models.yaml must reach batch requests, as it does
+    on the live path (run.py). Without it a reasoning model on batch is capped at the
+    global default and can spend the whole budget thinking."""
+    monkeypatch.setattr(batch, "_models_by_name", lambda: (
+        {"max_tokens": 8192, "generations": 1},
+        {"m": {**MISTRAL_CFG, "name": "m", "max_tokens": 32768}}))
+    run_id = _run_id("cap")
+    paths = batch.prepare(["m"], run_id, case_scope=loader.CASE_SCOPE_EXAMPLES)
+    rows = _read_jsonl(Path(json.loads(paths[0].read_text())["requests_file"]).resolve()
+                       if Path(json.loads(paths[0].read_text())["requests_file"]).is_absolute()
+                       else ROOT / json.loads(paths[0].read_text())["requests_file"])
+    assert rows and all(r["body"]["max_tokens"] == 32768 for r in rows)
+    import shutil
+    shutil.rmtree(ROOT / "outputs" / run_id, ignore_errors=True)
