@@ -331,7 +331,9 @@ models:
     # Batch validator rejected the id on launch day (notes/batch_probe.py
     # 2026-09-29: "not supported by the Batch API"; gpt-6-sol accepted as the
     # control). Same launch-day gap as GPT-5.6. The API wins; re-probe later.
-    batch_supported: false
+    # Re-probed 2026-10-06 before the v4.3 run: BATCHABLE.
+    batch_supported: true
+    batch_discount: 0.5          # pricing page: batch $1 / $5
     price_verified: "2026-09-29"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
@@ -1450,6 +1452,13 @@ models:
     structured_outputs: true     # strict json_schema accepted (probe 2026-10-06)
     batch_supported: true
     batch_discount: 0.5
+    # Output ceiling raised 2026-10-07 (METHODOLOGY "Model settings": raised when reasoning and
+    # answer share one budget and measurement shows the default is too tight). On 2026-10-06
+    # the model answered with no reasoning at its default; by the v4.3 run it returned a
+    # thinking chunk first, and 5 of 22 new-case batch answers spent the whole 8,192 cap
+    # thinking with no answer (finish_reason length). Its v4.2 answers used no reasoning, so
+    # the cap never bound them.
+    max_tokens: 32768
     price_verified: "2026-10-06"
     price_source: "https://mistral.ai/news/mistral-large-4"
 
