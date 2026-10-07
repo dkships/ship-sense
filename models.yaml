@@ -219,6 +219,23 @@ models:
     batch_discount: 0.5
     price_verified: "2026-08-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-haiku-5-5
+    provider: anthropic
+    id: claude-haiku-5-5
+    label: "Claude Haiku 5.5"       # spaced so `_lineage` reads version 5.5 and retires "Claude Haiku 4.5"
+    released: "2026-10-07"       # anthropic.com/claude-haiku-5-5 and the model page both say
+                                 # October 7, 2026; Models API created_at 2026-10-07T18:00Z.
+    price_in: 0.1                # TIERED: $0.10/$0.50 for prompts up to 100,000 tokens, $0.50/$2.50
+    price_out: 0.5               # above. Every Ship Sense prompt is far below 100k, so the lower tier
+                                 # is the price this bank pays. Cache read $0.01 (standard 0.1x).
+                                 # Shipped defaults on the Claude API: adaptive thinking ON, effort
+                                 # `medium`. Non-default temperature/top_p/top_k return 400.
+    api: messages
+    structured_outputs: true
+    batch_supported: true        # probed against the Batch API 2026-10-07, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-07"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-haiku-4-5
     provider: anthropic
     id: claude-haiku-4-5-20251001
@@ -930,7 +947,7 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true     # response_format json_schema strict, verified 2026-09-02
-    batch_supported: false       # re-probed 2026-09-02, see notes/session-log.md
+    batch_supported: false       # re-probed 2026-09-02, see notes/session-log.md; 2026-10-07: "batch API not enabled"
     price_verified: "2026-09-02"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
@@ -988,7 +1005,8 @@ models:
     stream: true                 # required by Moonshot benchmark-best-practice
     max_tokens: 32768            # docs floor is 16k for thinking models; see header
     timeout_s: 600
-    batch_supported: false       # Batch API covers K2.x only; K3 ineligible 2026-07-17
+    batch_supported: false       # Batch API covers K2.x only; K3 ineligible 2026-07-17; re-probed 2026-10-07: K3 404,
+                                 # control kimi-k2.6 accepted
     price_verified: "2026-08-24"
     price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
 
@@ -1068,7 +1086,8 @@ models:
     stream: true                 # vendor's own sample streams; long xhigh thinks
     max_tokens: 32768            # cap bounds reasoning+answer together; see header
     timeout_s: 900
-    batch_supported: false       # Batch API rejects the id; control passed twice
+    batch_supported: false       # Batch API rejects the id; control passed twice; re-probed 2026-10-07: still
+                                 # "not supported by the Batch API", control qwen-plus accepted
     # 2026-08-24: THE 2026-08-13 "DELISTED" CONCLUSION WAS WRONG, and the cause is
     # worth keeping. model-pricing builds its table CLIENT-SIDE (1617 rows in JS),
     # so a plain fetch returns a page with no qwen3.8-max in it at all. Read in a
@@ -1175,7 +1194,7 @@ models:
     structured_outputs: false    # json_object only on V4 — no json_schema
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
     timeout_s: 900
-    batch_supported: false       # DeepSeek has no batch API at all
+    batch_supported: false       # DeepSeek has no batch API at all (2026-10-07: /batches and /v1/batches 404)
     price_verified: "2026-08-24"
     price_source: "https://api-docs.deepseek.com/quick_start/pricing"
     # PEAK/OFF-PEAK BILLING LANDED 2026-08-16, re-verified first-party 2026-08-19.
@@ -1320,7 +1339,8 @@ models:
     stream: true                 # per-chunk timeout catches hangs; see header
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 4,496
     timeout_s: 240               # per chunk when streaming; a hang cost 45 min at 900 non-streamed
-    batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed
+    batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed; re-probed
+                                 # 2026-10-07: glm-5.3 still off the list (1210); glm-5.1 now needs ID verification (1000)
     price_verified: "2026-08-24"
     price_source: "https://docs.z.ai/guides/overview/pricing"
 
@@ -1399,7 +1419,7 @@ models:
     structured_outputs: false    # M3 has no response_format at all; prompt-level JSON
     max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
     timeout_s: 900
-    batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account
+    batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
     price_verified: "2026-09-22"
     price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
 
