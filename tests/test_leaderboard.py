@@ -360,6 +360,34 @@ def test_repriced_is_pure_and_daggers_only_a_real_move():
             assert (row["price_was_in"], row["price_was_out"]) == frozen[row["name"]]
 
 
+def test_intro_step_needs_the_introductory_flag_and_a_future_date():
+    """Only a vendor-announced launch price gets the intro mark: a price_pending
+    block without `introductory: true` (GPT-5.6 Sol's promo guard) never does,
+    and a window that has already ended never does."""
+    intro = {"price_pending": {"effective": "2026-12-01", "price_in": 4, "price_out": 20,
+                               "introductory": True}}
+    guard = {"price_pending": {"effective": "2026-12-01", "price_in": 4, "price_out": 20}}
+    assert lb._intro_step(intro, "2026-10-13") == {"from": "2026-12-01", "price_in": 4,
+                                                   "price_out": 20}
+    assert lb._intro_step(intro, "2026-12-01") is None
+    assert lb._intro_step(guard, "2026-10-13") is None
+    assert lb._intro_step({}, "2026-10-13") is None
+
+
+def test_board_marks_an_introductory_price_and_names_the_step_up(monkeypatch):
+    """Gemini 4 Argon's $2/$10 runs to 2026-11-30: the cell carries the mark and the
+    footnote says what it becomes and when, in both the page and the README."""
+    monkeypatch.setattr(lb, "_today", lambda: "2026-10-13")
+    run = lb.load_ledger()["runs"][-1]
+    row = next(m for m in lb._repriced(run["models"]) if m["name"] == "gemini-4-argon")
+    assert row["price_next"] == {"from": "2026-12-01", "price_in": 4, "price_out": 20}
+    assert lb._price_md(row) == "$2 / $10 ‡"
+    assert "&Dagger;" in lb._price_cell(row)
+
+    sol = next(m for m in lb._repriced(run["models"]) if m["name"] == "gpt-6.1-sol")
+    assert "price_next" not in sol and "‡" not in lb._price_md(sol)
+
+
 def test_board_shows_the_current_price_and_names_the_at_test_one():
     """A price cut after the run must neither silently rewrite the board's history
     nor leave it quoting a stale number as buying advice: the cell tracks the

@@ -31,6 +31,7 @@ import json
 import math
 import re
 from collections import Counter
+from datetime import date
 from html import escape
 from pathlib import Path
 
@@ -1303,8 +1304,15 @@ def _repriced(models: list[dict]) -> list[dict]:
     registry entirely keeps its frozen price and carries no dagger.
     """
     meta = loader.model_meta()
+    registry = _display_registry()
+    today = _today()
     out = []
     for m in models:
+        # An announced introductory price rides along as `price_next`.
+        step = _intro_step(registry.get(m["name"]) or {}, today)
+        if step:
+            m = dict(m, price_next=step)
+
         now = meta.get(m["name"]) or {}
         pin, pout = now.get("price_in"), now.get("price_out")
         if (pin is None and pout is None) or (pin, pout) == (m.get("price_in"), m.get("price_out")):
@@ -1314,6 +1322,36 @@ def _repriced(models: list[dict]) -> list[dict]:
                if m.get("price_in") is not None or m.get("price_out") is not None else {})
         out.append(dict(m, price_in=pin, price_out=pout, **was))
     return out
+
+
+def _today() -> str:
+    """Today's ISO date; a seam so tests can pin the clock."""
+    return date.today().isoformat()
+
+
+def _intro_step(entry: dict, today: str) -> dict | None:
+    """The announced step-up for a model still on an introductory price.
+
+    Only a `price_pending` block flagged `introductory: true` counts: the same
+    block also records promo end dates that are guards, not announced prices
+    (GPT-5.6 Sol). Once `effective` arrives the window is over, so no mark.
+    """
+    pending = entry.get("price_pending") or {}
+    if not pending.get("introductory"):
+        return None
+    effective = str(pending.get("effective") or "")
+    if not effective or effective <= today:
+        return None
+    return {"from": effective, "price_in": pending.get("price_in"),
+            "price_out": pending.get("price_out")}
+
+
+def _intro_pairs(models: list[dict]) -> list[tuple[str, str]]:
+    """(label, "rises to $X/$Y on <date>") for every intro-priced row, board order."""
+    fmt = lambda x: (f"${x:g}" if x is not None else "?")
+    return [(m["label"], f'rises to {fmt(m["price_next"]["price_in"])}/'
+                         f'{fmt(m["price_next"]["price_out"])} on {m["price_next"]["from"]}')
+            for m in models if "price_next" in m]
 
 
 def _repriced_pairs(models: list[dict]) -> list[tuple[str, str]]:
@@ -1335,6 +1373,11 @@ def _price_cell(m: dict) -> str:
         cell += (f'<span class="repriced" title="Repriced since this run: was '
                  f'{fmt(m["price_was_in"])}/{fmt(m["price_was_out"])} per 1M tokens '
                  f'when scored">&dagger;</span>')
+    if "price_next" in m:
+        nxt = m["price_next"]
+        cell += (f'<span class="repriced" title="Introductory price: '
+                 f'{fmt(nxt["price_in"])}/{fmt(nxt["price_out"])} per 1M tokens from '
+                 f'{nxt["from"]}">&Dagger;</span>')
     return f'<td class="cost">{cell}</td>'
 
 
@@ -3024,6 +3067,11 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
         repriced_note = (f' <b>&dagger;</b> marks a list price the provider has moved '
                          f'since this run scored it ({who}). The score is a measurement '
                          f'and does not move with the price.')
+    intro = _intro_pairs(models)
+    if intro:
+        who = "; ".join(f"{escape(label)} {step}" for label, step in intro)
+        repriced_note += (f' <b>&Dagger;</b> marks an introductory price with an announced '
+                          f'end ({who}).')
     coverage_note = ""
     if partial:
         who = ", ".join(f'{escape(r["label"])} ({r["n_items"]}/{bank_n})' for r in partial)
@@ -3427,7 +3475,11 @@ def _price_md(r: dict) -> str:
         return "—"
     fmt = lambda x: f"${x:g}" if x is not None else "—"
     price = f"{fmt(r.get('price_in'))} / {fmt(r.get('price_out'))}"
-    return f"{price} †" if "price_was_in" in r else price
+    if "price_was_in" in r:
+        price += " †"
+    if "price_next" in r:
+        price += " ‡"
+    return price
 
 
 def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[str]:
@@ -3579,6 +3631,10 @@ def render_markdown(ledger: dict) -> str:
         who = "; ".join(f"{label} was {was}" for label, was in moved)
         repriced_note = (f" · † = list price moved since this run scored it ({who}); "
                          "the score does not move with the price")
+    intro = _intro_pairs(models)
+    if intro:
+        who = "; ".join(f"{label} {step}" for label, step in intro)
+        repriced_note += f" · ‡ = introductory price with an announced end ({who})"
     avail_note = (" · <i>preview</i> / <i>beta</i> = the vendor's pre-release label on the "
                   "model when its answers were collected"
                   if any(amap.get(r["name"]) for r in eligible + partial) else "")
