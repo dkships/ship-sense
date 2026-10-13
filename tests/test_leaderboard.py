@@ -360,6 +360,20 @@ def test_repriced_is_pure_and_daggers_only_a_real_move():
             assert (row["price_was_in"], row["price_was_out"]) == frozen[row["name"]]
 
 
+def test_generation_rows_carry_the_vendor_preview_tag():
+    """Gemini 3.1 Pro was a preview when it answered; retiring it to the
+    generations view must not drop the label the main board showed."""
+    ledger = lb.load_ledger()
+    md = lb.render_markdown(ledger)
+    gens = md[md.index("### Current vs. previous generations"):]
+    assert "| Gemini 3.1 Pro <i>preview</i> — 82.5" in gens
+
+    html = lb.render_html(ledger)
+    section = html[html.index('id="generations"'):]
+    row = section[section.index('<span class="label">Gemini 3.1 Pro'):][:400]
+    assert '<abbr class="avail"' in row
+
+
 def test_intro_step_needs_the_introductory_flag_and_a_future_date():
     """Only a vendor-announced launch price gets the intro mark: a price_pending
     block without `introductory: true` (GPT-5.6 Sol's promo guard) never does,
