@@ -301,6 +301,31 @@ def _date_from_run_id(run_id: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _replaced_note(models: list[dict], previous: list[dict], html: bool) -> str:
+    """One sentence per replaced model, with its score, so a model that left the
+    current board (replaced_by) is never silently missing from either surface."""
+    replaced = replacements(models)
+    by_name = {m["name"]: m for m in models}
+    esc = escape if html else (lambda t: t)
+    slot = "lab&rsquo;s slot" if html else "lab's slot"
+    out = ""
+    for m in previous:
+        if m["name"] not in replaced:
+            continue
+        out += (f' {esc(m["label"])} ({m["score"]["value"]:.1f}) left the board when '
+                f'{esc(by_name[replaced[m["name"]]]["label"])} took its {slot}; '
+                f'not compared as a generation.')
+    return out
+
+
+def _run_date_text(run: dict) -> str:
+    """'2026-10-07', or '2026-10-07, updated 2026-10-12' once a model was merged
+    in later, so a model released after the run date never looks misdated."""
+    date = str(run.get("run_date") or run["run_id"])
+    updated = run.get("updated")
+    return f"{date}, updated {updated}" if updated and updated != date else date
+
+
 def _sort_models(models: list[dict]) -> list[dict]:
     """Rankable models by score desc, provisional next, baselines last."""
     def key(e):
@@ -508,6 +533,10 @@ def merge_snapshot(ledger: dict, target_run_id: str, snapshot: dict) -> dict:
             "Re-run without mock-naive (the target run already carries the floor).")
     existing = {m["name"]: m for m in target["models"]}
     stamp_bench_version(snapshot["models"], target.get("version"))
+    # A late model makes the board newer than its run date; say so on the page.
+    added = snapshot.get("run_date") or _date_from_run_id(snapshot["run_id"])
+    if added and added > (target.get("updated") or target.get("run_date") or ""):
+        target["updated"] = added
     for m in snapshot["models"]:
         existing[m["name"]] = m
     target["models"] = _sort_models(list(existing.values()))
@@ -660,6 +689,67 @@ def successions(models: list[dict]) -> dict[str, str]:
     return out
 
 
+def _display_registry() -> dict[str, dict]:
+    """models.yaml by name, for display-only fields. Read straight from the
+    file, not loader.model_meta(): loader.py is fingerprinted by scorer_hash(),
+    and a display-only field must not invalidate every run's bank manifest."""
+    try:
+        return {m["name"]: m for m in
+                (yaml.safe_load(loader.MODELS_FILE.read_text()) or {})
+                .get("models", [])}
+    except (FileNotFoundError, yaml.YAMLError):
+        return {}
+
+
+# The vendor's own pre-release label for a model id, shown beside its name.
+AVAILABILITY_PREVIEW = "preview"
+AVAILABILITY_BETA = "beta"
+_AVAILABILITY_TIP = {
+    AVAILABILITY_PREVIEW: "The vendor labelled this model a preview when its answers were collected",
+    AVAILABILITY_BETA: "The vendor labelled this model a beta when its answers were collected",
+}
+_AVAILABILITY_TIP_TAIL = (": a pre-release model can still change behind the same id, so the "
+                          "score describes it as it was then.")
+
+
+def availability() -> dict[str, str]:
+    """Model name -> the vendor's pre-release label ("preview", "beta") in force
+    when the model's board answers were collected, from models.yaml. Frozen like
+    the at-test price: it changes only when the model answers again. Display-only:
+    no score reads it."""
+    out = {}
+    for name, m in _display_registry().items():
+        label = m.get("availability")
+        if label in _AVAILABILITY_TIP:
+            out[name] = label
+    return out
+
+
+def _avail_html(label: str | None) -> str:
+    """The page's tag: the vendor's word in muted italic serif, with its meaning
+    on hover/focus."""
+    if not label:
+        return ""
+    tip = escape(_AVAILABILITY_TIP[label] + _AVAILABILITY_TIP_TAIL)
+    return f' <abbr class="avail" title="{tip}" tabindex="0">{label}</abbr>'
+
+
+def _avail_tspan(label: str | None) -> str:
+    """The same tag inside an SVG label (score field, share card)."""
+    if not label:
+        return ""
+    return f'<tspan class="favail" dx="6">{label}</tspan>'
+
+
+def _avail_note(rows: list[dict], amap: dict[str, str]) -> str:
+    """One sentence under the table naming what the tag means, only when used."""
+    if not any(amap.get(r["name"]) for r in rows):
+        return ""
+    return (' <i class="avail">preview</i> and <i class="avail">beta</i> are the '
+            "vendor&rsquo;s own pre-release label on the model when its answers were "
+            "collected; a pre-release model can change behind the same id.")
+
+
 def replacements(models: list[dict]) -> dict[str, str]:
     """Replaced model name -> the ranked model that took its lab slot.
 
@@ -669,15 +759,7 @@ def replacements(models: list[dict]) -> dict[str, str]:
     leaves the current board like a superseded one, but it is NOT a succession:
     no generation pair, no confirmatory test, because a different tier is not
     a previous version. Same ranked-only rule as successions()."""
-    # Read straight from models.yaml, not loader.model_meta(): loader.py is
-    # fingerprinted by scorer_hash(), and a display-only field must not
-    # invalidate every run's bank manifest.
-    try:
-        registry = {m["name"]: m for m in
-                    (yaml.safe_load(loader.MODELS_FILE.read_text()) or {})
-                    .get("models", [])}
-    except (FileNotFoundError, yaml.YAMLError):
-        registry = {}
+    registry = _display_registry()
     ranked = {m["name"] for m in models
               if not m.get("is_baseline") and m.get("ranked_eligible", True)}
     out: dict[str, str] = {}
@@ -1123,25 +1205,36 @@ def _md_inline(s: str) -> str:
 #         can excuse), CVD 4.8 -- BELOW the 6.0 floor, which is legal here only
 #         because the square mark and the labeled table carry identity for
 #         dichromat readers. Contrast 3.12:1.
-# A 12th lab cannot take a hue at all; fold into grouping/facets instead.
+#   12th (Reflection, 2026-10-12): as predicted, no hue clears both floors. Of
+#         8,961 in-band candidates (h step 5, S .30-.95, L .20-.60) 183 clear the
+#         normal floor and NONE also reaches CVD 6.0; every passer is a bright
+#         green whose nearest ink is OpenAI's. Picked #19c20a (h115 S.90 L.40):
+#         normal 15.5 vs #10a37f, CVD 4.3, contrast 2.14:1 (the most visible
+#         passer; #11d473 has CVD 5.5 but 1.75:1 on the paper). The triangle
+#         mark carries identity for dichromat readers, as the square does for
+#         Mistral. A 13th lab has no hue left; facet or group instead.
 #     node <dataviz>/scripts/validate_palette.js \
-#     "#c15f3c,#10a37f,#3d6fc4,#8e3b78,#526200,#d5a33d,#5910c6,#33aaff,#b675bd,#c813ec,#fa2ea5" \
+#     "#c15f3c,#10a37f,#3d6fc4,#8e3b78,#526200,#d5a33d,#5910c6,#33aaff,#b675bd,#c813ec,#fa2ea5,#19c20a" \
 #     --mode light --surface "#f4f2ea" --pairs all
 _PROVIDER_INK = {"anthropic": "#c15f3c", "openai": "#10a37f", "google": "#3d6fc4",
                  "xai": "#8e3b78", "meta": "#526200", "moonshot": "#d5a33d",
                  "qwen": "#5910c6", "deepseek": "#33aaff", "zai": "#b675bd",
-                 "minimax": "#c813ec", "mistral": "#fa2ea5"}
+                 "minimax": "#c813ec", "mistral": "#fa2ea5",
+                 "reflection": "#19c20a"}
 # Mark shape per lab; absent = the round dot every earlier lab keeps. The page
 # applies it through _shape_css (selectors keyed on the ink, so every dot the
 # renderers already paint picks it up), the card through provider_dot.
 _SHAPE_DIAMOND = "diamond"
 _SHAPE_SQUARE = "square"
-_PROVIDER_SHAPE = {"minimax": _SHAPE_DIAMOND, "mistral": _SHAPE_SQUARE}
+_SHAPE_TRIANGLE = "triangle"
+_PROVIDER_SHAPE = {"minimax": _SHAPE_DIAMOND, "mistral": _SHAPE_SQUARE,
+                   "reflection": _SHAPE_TRIANGLE}
 # xAI's docs have rebranded to "SpaceXAI"; the API still reports owned_by: "xai".
 _PROVIDER_NAME = {"anthropic": "Anthropic", "openai": "OpenAI", "google": "Google",
                   "xai": "xAI", "meta": "Meta", "moonshot": "Moonshot",
                   "qwen": "Qwen", "deepseek": "DeepSeek", "zai": "Z.ai",
-                  "minimax": "MiniMax", "mistral": "Mistral"}
+                  "minimax": "MiniMax", "mistral": "Mistral",
+                  "reflection": "Reflection"}
 
 
 def _provider_color(provider: str | None) -> str:
@@ -1278,7 +1371,8 @@ def _rank_cell(r: dict) -> str:
             f'<span class="ciq">P(#1) {_p_first_text(r)}</span></td>')
 
 
-def _model_row(r: dict, bank_n: int | None = None) -> str:
+def _model_row(r: dict, bank_n: int | None = None,
+               amap: dict[str, str] | None = None) -> str:
     if r.get("ranked_eligible", True):
         rank = f"{r['pos']}"
         cls = ""
@@ -1298,7 +1392,8 @@ def _model_row(r: dict, bank_n: int | None = None) -> str:
     return (f'<tr{cls}>'
             f'<td class="rank">{rank}</td>'
             f'<td class="model"><span class="dot" style="background:{color}"></span>'
-            f'<span class="mname"><span class="label">{escape(r["label"])}</span>'
+            f'<span class="mname"><span class="label">{escape(r["label"])}'
+            f'{_avail_html((amap or {}).get(r["name"]))}</span>'
             f'<span class="provider">{escape(_provider_name(r.get("provider")))}{_version_tag(r)}</span>'
             f'{_coverage(r, bank_n)}</span></td>'
             f'<td class="rel">{released}</td>'
@@ -1393,7 +1488,7 @@ CSS = """
 --line:#e3ddce;--rail:#e6e0d1;--dim-bar:#b6ae9d;
 --acc:#0f766e;--acc-soft:#d9ebe6;--warn:#9a5b00;
 --hero:#141009;--hero2:#241d10;--hero-ink:#f5f1e6;--hero-mut:#a79e8a;--hero-line:#3a3222;
---anthropic:#c15f3c;--openai:#10a37f;--google:#3d6fc4;--xai:#8e3b78;--meta:#526200;--moonshot:#d5a33d;--qwen:#5910c6;--deepseek:#33aaff;--zai:#b675bd;--minimax:#c813ec;--mistral:#fa2ea5;
+--anthropic:#c15f3c;--openai:#10a37f;--google:#3d6fc4;--xai:#8e3b78;--meta:#526200;--moonshot:#d5a33d;--qwen:#5910c6;--deepseek:#33aaff;--zai:#b675bd;--minimax:#c813ec;--mistral:#fa2ea5;--reflection:#19c20a;
 --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
 --sans:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
 --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
@@ -1418,7 +1513,7 @@ padding-bottom:1.9rem;margin-bottom:2.1rem;border-bottom:1px solid var(--hero-li
 .wordmark{display:flex;align-items:center;gap:.6rem;font:700 .82rem/1 var(--mono);
 letter-spacing:.28em;text-transform:uppercase;color:var(--hero-ink)}
 .wordmark .glyph{width:12px;height:12px;border-radius:50%;
-background:conic-gradient(from 210deg,var(--anthropic),var(--openai),var(--google),var(--xai),var(--meta),var(--moonshot),var(--qwen),var(--deepseek),var(--zai),var(--minimax),var(--mistral),var(--anthropic))}
+background:conic-gradient(from 210deg,var(--anthropic),var(--openai),var(--google),var(--xai),var(--meta),var(--moonshot),var(--qwen),var(--deepseek),var(--zai),var(--minimax),var(--mistral),var(--reflection),var(--anthropic))}
 .jump{display:flex;gap:1.4rem;flex-wrap:wrap;margin:-1.1rem 0 1.9rem}
 .jump a{font:600 .68rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
 color:var(--hero-mut);border-bottom:0}
@@ -1494,6 +1589,10 @@ thead th{white-space:nowrap}
 .model .mname{display:inline-block;vertical-align:top;max-width:calc(100% - 1.5rem)}
 .model .label{font-weight:600;display:block;font-size:.98rem}
 .model .provider{color:var(--faint);font-size:.76rem;white-space:nowrap}
+.avail{font:italic 400 .82rem/1 var(--serif);color:var(--mut);letter-spacing:.01em}
+abbr.avail{margin-left:.3rem;text-decoration:underline dotted var(--faint);
+text-underline-offset:.2em;cursor:help;white-space:nowrap}
+abbr.avail:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:2px}
 .model .cov{display:block;color:var(--warn);font-size:.72rem;margin-top:.12rem}
 .rel{color:var(--mut);font:.82rem/1 var(--mono);white-space:nowrap}
 .cost{color:var(--mut);font:.82rem/1 var(--mono);white-space:nowrap}
@@ -1531,9 +1630,11 @@ padding:1.1rem 1.2rem .6rem;margin:0 0 1.1rem}
    an accent-colored hover reads as another lab's mark. Grow, darken, brighten —
    never recolor. */
 .field .frow:hover circle{r:6}
+.field .frow:hover path,.field .frow:hover rect{transform-box:fill-box;transform-origin:center;transform:scale(1.2)}
 .field .frow:hover line{opacity:.9}
 .field .frow:hover .fnum{fill:var(--ink)}
 .field .fmut{fill:var(--faint);font-weight:400}
+.field .favail{font:italic 400 12px var(--serif);fill:var(--mut)}
 .field .fverd{font:600 11px var(--sans);fill:var(--mut)}
 .field .fwin{fill:var(--acc)}
 .field .floss{fill:var(--warn)}
@@ -1542,6 +1643,8 @@ padding:1.1rem 1.2rem .6rem;margin:0 0 1.1rem}
 .field .fscurr{font:700 11.5px var(--mono);fill:var(--ink)}
 .field .fbench{font:600 10.5px var(--mono);fill:var(--mut);letter-spacing:.06em}
 .fcap{font:.74rem/1.5 var(--mono);color:var(--faint);margin:.5rem 0 .4rem}
+.field .fref{stroke:var(--mut);stroke-width:1.25;stroke-dasharray:4 4;opacity:.8}
+.wlede{font-size:.95rem;line-height:1.6;color:var(--mut);max-width:52rem;margin:0 0 1rem}
 
 /* ---- generation matchup cards ---- */
 .gcards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:0 0 1.1rem}
@@ -1734,6 +1837,7 @@ table:not(.hist):not(.matrix) .rank{width:2.1rem;padding-right:.4rem}
 table:not(.hist):not(.matrix) thead th{white-space:normal}
 table:not(.hist):not(.matrix) .model{min-width:0}
 table:not(.hist):not(.matrix) .model .label{white-space:nowrap}
+.model abbr.avail{display:block;margin:.1rem 0 0}
 table:not(.hist):not(.matrix) .model .provider{white-space:normal}
 table:not(.hist):not(.matrix) .score{min-width:5.5rem}
 table:not(.hist):not(.matrix) td.rrange{white-space:normal}
@@ -1748,8 +1852,11 @@ table:not(.hist):not(.matrix) th,table:not(.hist):not(.matrix) td{padding-left:.
 def _shape_css() -> str:
     """CSS giving each _PROVIDER_SHAPE lab its mark on the page: every dot and
     legend swatch carries its ink inline, so the selectors key on that."""
-    rules = {_SHAPE_DIAMOND: "border-radius:1px;transform:rotate(45deg) scale(.86)",
-             _SHAPE_SQUARE: "border-radius:2px"}
+    # !important: table-scoped dot rules (e.g. the head-to-head rows) set
+    # border-radius with higher specificity and would round the mark back.
+    rules = {_SHAPE_DIAMOND: "border-radius:1px!important;transform:rotate(45deg) scale(.86)",
+             _SHAPE_SQUARE: "border-radius:2px!important",
+             _SHAPE_TRIANGLE: "border-radius:0!important;clip-path:polygon(50% 0,100% 100%,0 100%)"}
     out = []
     for lab, shape in _PROVIDER_SHAPE.items():
         out.append(f'.dot[style*="{_PROVIDER_INK[lab]}"],'
@@ -1980,6 +2087,7 @@ _FIELD_STANDALONE_CSS = (
     ".field .ftick{font:10.5px ui-monospace,Menlo,Consolas,monospace;fill:#948c7b}"
     ".field .fnum{font:700 12.5px ui-monospace,Menlo,Consolas,monospace;fill:#645e51}"
     ".field .fmut{fill:#948c7b;font-weight:400}"
+    ".field .favail{font:italic 400 12px Georgia,'Times New Roman',serif;fill:#645e51}"
     ".field .fverd{font:600 11px 'Helvetica Neue',Helvetica,Arial,sans-serif;fill:#645e51}"
     ".field .fwin{fill:#0f766e}"
     ".field .floss{fill:#9a5b00}"
@@ -1988,6 +2096,7 @@ _FIELD_STANDALONE_CSS = (
     ".field .fscurr{font:700 11.5px ui-monospace,Menlo,Consolas,monospace;fill:#17130c}"
     ".field .fbench{font:600 10.5px ui-monospace,Menlo,Consolas,monospace;fill:#645e51;"
     "letter-spacing:.06em}"
+    ".field .fref{stroke:#645e51;stroke-width:1.25;stroke-dasharray:4 4;opacity:.8}"
 )
 
 
@@ -2007,12 +2116,34 @@ def render_field_svg(ledger: dict) -> str:
     return svg.replace("</svg>", f"<style>{_FIELD_STANDALONE_CSS}</style></svg>")
 
 
+def _svg_mark(provider: str | None, cx: float, cy: float, r: float = 5.0) -> str:
+    """A chart point in the lab's ink and mark shape (the legend's shape), with
+    the card-colored ring every field dot carries."""
+    color = _provider_color(provider)
+    shape = _PROVIDER_SHAPE.get((provider or "").lower())
+    ring = 'stroke="var(--card)" stroke-width="2"'
+    if shape == _SHAPE_DIAMOND:
+        d = r * 1.2
+        return (f'<path d="M{cx:.1f} {cy - d:.1f}L{cx + d:.1f} {cy:.1f}L{cx:.1f} {cy + d:.1f}'
+                f'L{cx - d:.1f} {cy:.1f}Z" fill="{color}" {ring}/>')
+    if shape == _SHAPE_SQUARE:
+        d = r * 0.9
+        return (f'<rect x="{cx - d:.1f}" y="{cy - d:.1f}" width="{2 * d:.1f}" '
+                f'height="{2 * d:.1f}" rx="1" fill="{color}" {ring}/>')
+    if shape == _SHAPE_TRIANGLE:
+        d = r * 1.2
+        return (f'<path d="M{cx:.1f} {cy - d:.1f}L{cx + d:.1f} {cy + d * .8:.1f}'
+                f'L{cx - d:.1f} {cy + d * .8:.1f}Z" fill="{color}" {ring}/>')
+    return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:g}" fill="{color}" {ring}/>'
+
+
 def _score_field_svg(ranked: list[dict]) -> str:
     """The score-field SVG itself: rank-ordered dot-and-whisker per model,
     95% CI whiskers in lab ink."""
     rows = [r for r in ranked if r.get("ranked_eligible", True)]
     if not rows:
         return ""
+    amap = availability()
     lo_all = min(r["score"]["lo"] for r in rows)
     hi_all = max(r["score"]["hi"] for r in rows)
     x0, x1 = 5 * math.floor((lo_all - 1) / 5), 5 * math.ceil((hi_all + 1) / 5)
@@ -2039,11 +2170,11 @@ def _score_field_svg(ranked: list[dict]) -> str:
         parts.append(
             f'<g class="frow"><title>{escape(r["label"])} — {sc["value"]:.1f} '
             f'[{sc["lo"]:.1f}, {sc["hi"]:.1f}] · {dims}</title>'
-            f'<text x="{left - 14}" y="{y + 4}" text-anchor="end" class="flabel">{escape(r["label"])}</text>'
+            f'<text x="{left - 14}" y="{y + 4}" text-anchor="end" class="flabel">{escape(r["label"])}'
+            f'{_avail_tspan(amap.get(r["name"]))}</text>'
             f'<line x1="{sx(sc["lo"]):.1f}" y1="{y:.1f}" x2="{sx(sc["hi"]):.1f}" y2="{y:.1f}" '
             f'stroke="{color}" stroke-width="2" stroke-linecap="round" opacity=".55"/>'
-            f'<circle cx="{sx(sc["value"]):.1f}" cy="{y:.1f}" r="5" fill="{color}" '
-            f'stroke="var(--card)" stroke-width="2"/>'
+            f'{_svg_mark(r.get("provider"), sx(sc["value"]), y)}'
             f'<text x="{vw - right + 12}" y="{y + 4}" class="fnum">{sc["value"]:.1f}</text></g>')
     parts.append("</svg>")
     return "".join(parts)
@@ -2061,6 +2192,207 @@ def _score_field(ranked: list[dict], run: dict) -> str:
     return (f'<div class="fieldwrap">{svg}'
             f'<p class="fcap">Dot = point score &middot; whisker = 95% item-clustered bootstrap CI'
             f'{floor_note}.</p></div>')
+
+
+# --------------------------------------------------------------------------- #
+# Open-weight and closed models: the same lineup split by whether you can
+# download the weights. "Open-weight", not "open source": the OSI definition also
+# requires training code and data detail, which almost no frontier release meets.
+# --------------------------------------------------------------------------- #
+# `weights` in models.yaml: "open" = weights for this exact version downloadable
+# on the run date under a published licence; "pending" = the vendor has promised
+# them but they have not shipped. Absent = closed. Pending counts as CLOSED here
+# (you cannot self-host it yet) and carries a "weights due" tag.
+WEIGHTS_OPEN = "open"
+WEIGHTS_PENDING = "pending"
+_WEIGHTS_DUE_TIP = ("The vendor has announced an open-weight release for this model; "
+                    "it had not shipped on the run date, so it counts as closed.")
+# Geometry for the two-band chart; shares the score field's row rhythm.
+_WEIGHTS_LEFT, _WEIGHTS_RIGHT, _WEIGHTS_VW = 262, 132, 960
+_WEIGHTS_ROW_H, _WEIGHTS_TOP, _WEIGHTS_BAND_GAP = 26, 40, 30
+
+
+def weights() -> dict[str, str]:
+    """Model name -> "open" or "pending" from models.yaml; absent = closed."""
+    out = {}
+    for name, m in _display_registry().items():
+        w = m.get("weights")
+        if w in (WEIGHTS_OPEN, WEIGHTS_PENDING):
+            out[name] = w
+    return out
+
+
+def weights_licenses() -> dict[str, str]:
+    """Model name -> the short licence note for an open-weight model."""
+    return {name: m["weights_license"] for name, m in _display_registry().items()
+            if m.get("weights") == WEIGHTS_OPEN and m.get("weights_license")}
+
+
+def weights_groups(ranked: list[dict], records: list[dict] | None
+                   ) -> tuple[list[dict], list[dict]]:
+    """(open, closed) ranked rows of the current lineup, each re-ranked within
+    its own group: `pos` is the order inside the group, and the rank range is
+    recomputed from the same paired tests with Holm over the group's own
+    pairs, so it is a valid 95% statement about rank among open (or closed)
+    models. P(#1) is a whole-board quantity and is dropped."""
+    wmap = weights()
+    eligible = _eligible_rows(ranked)
+    groups = []
+    for is_open in (True, False):
+        members = [{k: v for k, v in r.items()
+                    if k not in ("rank_lo", "rank_hi", "p_first")}
+                   for r in eligible if (wmap.get(r["name"]) == WEIGHTS_OPEN) == is_open]
+        groups.append(attach_rank_sets(rank_with_ties(members), records))
+    return groups[0], groups[1]
+
+
+def _weights_record(a: str, b: str, records: list[dict] | None) -> dict | None:
+    """The paired record for a vs b, oriented a - b."""
+    for r in records or []:
+        if (r["a"], r["b"]) == (a, b):
+            return r
+        if (r["a"], r["b"]) == (b, a):
+            return {**r, "a": a, "b": b, "delta": -r["delta"],
+                    "lo": -r["hi"], "hi": -r["lo"]}
+    return None
+
+
+def weights_summary(open_rows: list[dict], closed_rows: list[dict],
+                    records: list[dict] | None) -> dict | None:
+    """The comparison the section leads with: best closed minus best open on
+    the paired estimator, and how many closed models beat the best open one
+    at the exploratory threshold. Leaders are picked by point score, so the
+    gap is descriptive, not a test of open against closed as categories."""
+    if not open_rows or not closed_rows:
+        return None
+    best_open, best_closed = open_rows[0], closed_rows[0]
+    rec = _weights_record(best_closed["name"], best_open["name"], records)
+    above = []
+    for r in closed_rows:
+        pair = _weights_record(r["name"], best_open["name"], records)
+        if pair and pair.get("winner_exploratory") == r["name"]:
+            above.append(r)
+    return {"open": best_open, "closed": best_closed, "record": rec, "above": above,
+            "n_closed": len(closed_rows)}
+
+
+def _weights_lede(summary: dict, html: bool = True) -> str:
+    """One sentence: the gap between the two groups' leaders, with its interval."""
+    o, c, rec = summary["open"], summary["closed"], summary["record"]
+    em = (lambda t: f"<b>{escape(t)}</b>") if html else (lambda t: f"**{t}**")
+    text = (f'The best open-weight model, {em(o["label"])} ({o["score"]["value"]:.1f}), '
+            f'and the best closed one, {em(c["label"])} ({c["score"]["value"]:.1f})')
+    if rec:
+        d, lo, hi = rec["delta"] * 100, rec["lo"] * 100, rec["hi"] * 100
+        call = ("a decisive gap" if rec.get("winner_exploratory") == c["name"]
+                else "not a decisive gap")
+        text += (f', are {d:.1f} points apart on the paired test '
+                 f'[{lo:+.1f}, {hi:+.1f}], {call}')
+    n_above, n_closed = len(summary["above"]), summary["n_closed"]
+    count = (f"None of the {n_closed}" if n_above == 0
+             else f"{n_above} of the {n_closed}")
+    text += f'. {count} closed models score decisively above {em(o["label"])}.'
+
+    return text
+
+
+def _weights_svg(open_rows: list[dict], closed_rows: list[dict]) -> str:
+    """Two bands on one shared score axis (open above, closed below), dot and
+    whisker per model in lab ink, with each model's in-group rank range at the
+    right. One hue-neutral dashed rule marks the best open score through both
+    bands, so the closed models that clear it read at a glance."""
+    if not open_rows or not closed_rows:
+        return ""
+    amap, wmap, lic = availability(), weights(), weights_licenses()
+    rows = open_rows + closed_rows
+    lo_all = min(r["score"]["lo"] for r in rows)
+    hi_all = max(r["score"]["hi"] for r in rows)
+    x0, x1 = 5 * math.floor((lo_all - 1) / 5), 5 * math.ceil((hi_all + 1) / 5)
+    left, right, vw = _WEIGHTS_LEFT, _WEIGHTS_RIGHT, _WEIGHTS_VW
+    row_h, top, gap = _WEIGHTS_ROW_H, _WEIGHTS_TOP, _WEIGHTS_BAND_GAP
+    plot_w = vw - left - right
+    head_h = 22
+    h = top + 2 * head_h + len(rows) * row_h + gap + 30
+
+    def sx(v: float) -> float:
+        return left + (v - x0) / (x1 - x0) * plot_w
+
+    parts = [f'<svg class="field weights" viewBox="0 0 {vw} {h}" role="img" '
+             f'aria-label="Ship Sense scores with 95% confidence intervals, open-weight '
+             f'models above and closed models below, on one shared axis">']
+    for t in range(x0, x1 + 1, 5):
+        parts.append(f'<line x1="{sx(t):.1f}" y1="{top - 8}" x2="{sx(t):.1f}" y2="{h - 26}" '
+                     f'stroke="var(--line)" stroke-width="1"/>'
+                     f'<text x="{sx(t):.1f}" y="{top - 14}" text-anchor="middle" class="ftick">{t}</text>')
+    parts.append(f'<text x="{vw - 8}" y="{top - 14}" text-anchor="end" class="ftick">'
+                 f'rank in group</text>')
+
+    y = top
+    for title, group in (("Open-weight", open_rows), ("Closed", closed_rows)):
+        parts.append(f'<text x="{left - 14}" y="{y + 14}" text-anchor="end" class="fbench">'
+                     f'{title} &#183; {len(group)}</text>')
+        y += head_h
+        for r in group:
+            cy = y + row_h / 2
+            sc = r["score"]
+            color = _provider_color(r.get("provider"))
+            due = ""
+            if wmap.get(r["name"]) == WEIGHTS_PENDING:
+                due = '<tspan class="favail" dx="6">weights due</tspan>'
+            parts.append(
+                f'<g class="frow"><title>{escape(r["label"])} — {sc["value"]:.1f} '
+                f'[{sc["lo"]:.1f}, {sc["hi"]:.1f}] · rank in group {_rank_range(r)}'
+                f'{escape(" · " + lic[r["name"]]) if r["name"] in lic else ""}</title>'
+                f'<text x="{left - 14}" y="{cy + 4}" text-anchor="end" class="flabel">'
+                f'{escape(r["label"])}{_avail_tspan(amap.get(r["name"]))}{due}</text>'
+                f'<line x1="{sx(sc["lo"]):.1f}" y1="{cy:.1f}" x2="{sx(sc["hi"]):.1f}" y2="{cy:.1f}" '
+                f'stroke="{color}" stroke-width="2" stroke-linecap="round" opacity=".55"/>'
+                f'{_svg_mark(r.get("provider"), sx(sc["value"]), cy)}'
+                f'<text x="{vw - right + 12}" y="{cy + 4}" class="fnum">{sc["value"]:.1f}</text>'
+                f'<text x="{vw - 8}" y="{cy + 4}" text-anchor="end" class="fnum fmut">'
+                f'{_rank_range(r)}</text></g>')
+            y += row_h
+        y += gap
+
+    # The open frontier: drawn last so it reads over the gridlines, hue-neutral.
+    ref = open_rows[0]["score"]["value"]
+    parts.append(f'<line x1="{sx(ref):.1f}" y1="{top - 4}" x2="{sx(ref):.1f}" y2="{h - 26}" '
+                 f'class="fref"/>'
+                 f'<text x="{sx(ref):.1f}" y="{h - 10}" text-anchor="middle" class="ftick">'
+                 f'best open-weight {ref:.1f}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _weights_section(ranked: list[dict], records: list[dict] | None) -> str:
+    """The page section: lede, the two-band chart, and what the split means."""
+    open_rows, closed_rows = weights_groups(ranked, records)
+    summary = weights_summary(open_rows, closed_rows, records)
+    svg = _weights_svg(open_rows, closed_rows)
+    if not summary or not svg:
+        return ""
+    pending = [r for r in closed_rows if weights().get(r["name"]) == WEIGHTS_PENDING]
+    pending_note = ""
+    if pending:
+        labels = [escape(r["label"]) for r in pending]
+        names = (labels[0] if len(labels) == 1
+                 else ", ".join(labels[:-1]) + " and " + labels[-1])
+        pending_note = (f" {names} {'has' if len(pending) == 1 else 'have'} announced "
+                        "open weights that had not shipped, so "
+                        f"{'it counts' if len(pending) == 1 else 'they count'} as closed "
+                        "(<i class=\"avail\">weights due</i>).")
+    lic = weights_licenses()
+    lic_note = "; ".join(f"{escape(r['label'])}: {escape(lic[r['name']])}"
+                         for r in open_rows if r["name"] in lic)
+    if lic_note:
+        lic_note = f" Licences on the run date: {lic_note}."
+    return f"""<section id="weights">
+<h2>Open-weight and closed models <span class="meta">the board above, split &middot; {len(open_rows)} open-weight &middot; {len(closed_rows)} closed</span></h2>
+<p class="wlede">{_weights_lede(summary)}</p>
+<div class="fieldwrap">{svg}
+<p class="fcap">Shared axis &middot; dot = point score &middot; whisker = 95% CI &middot; dashed rule = best open-weight score &middot; right = rank range within the group.</p></div>
+<p class="note">Open-weight means this exact version&rsquo;s weights were downloadable on the run date under a published licence. That is not open source, which also needs the training code and data.{pending_note} Group rank ranges use the main board&rsquo;s paired tests, Holm-corrected within the group. The leaders are picked by point score, so their gap describes this lineup, not open-weight models in general.{lic_note}</p>
+</section>"""
 
 
 # Vertical room (viewBox units) between the latest bench's arrows and an
@@ -2539,7 +2871,7 @@ def _share_description(run: dict, ranked: list[dict]) -> str:
     n_models = len(eligible)
     bank_n = run["bank"]["n_items"]
     contenders = _contenders(ranked)
-    date = run.get("run_date") or run["run_id"]
+    date = _run_date_text(run)
     if eligible:
         top = eligible[0]
         result = f"{top['label']} has the top score, {top['score']['value']:.1f}"
@@ -2605,8 +2937,8 @@ def _hero_focal(run: dict, ranked: list[dict]) -> str:
     if top.get("rank_lo") is None:
         within = "Top point score"
     elif len(contenders) > 1:
-        within = (f"Rank range {_rank_range(top)} &middot; {len(contenders)} models "
-                  f"could be #1 &middot; P(#1) {_p_first_text(top)}")
+        within = (f"{len(contenders)} models could be #1 &middot; its rank range "
+                  f"{_rank_range(top)} &middot; P(#1) {_p_first_text(top)}")
     elif top.get("rank_hi") != 1:
         # Only this model can be #1, yet its own set is wider: rank sets are
         # Holm-corrected per model, so they need not be symmetric.
@@ -2617,7 +2949,7 @@ def _hero_focal(run: dict, ranked: list[dict]) -> str:
     floor_txt = f"{floor_name} {floor:.1f}. " if floor is not None else ""
     return (
         '<div class="focal">'
-        f'<div class="flabel">Top score &middot; {top.get("n_items", 0)}/'
+        f'<div class="flabel">Highest point score &middot; {top.get("n_items", 0)}/'
         f'{run["bank"].get("n_items", 0)} items</div>'
         f'<div class="fmodel"><span class="dot" style="background:{color}"></span>'
         f'{escape(top["label"])}</div>'
@@ -2648,13 +2980,14 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
     bank_n = b.get("n_items")
     n_models = sum(1 for m in current if not m["is_baseline"])
     partial = [r for r in ranked if not r.get("ranked_eligible", True)]
-    rows = "".join(_model_row(r, bank_n) for r in eligible)
+    amap = availability()
+    rows = "".join(_model_row(r, bank_n, amap) for r in eligible)
     if partial:
         rows += _section_row(
             "Provisional estimates",
             f"not ranked: below {int(RANKED_COVERAGE_MIN * 100)}% coverage or missing a dimension",
         )
-        rows += "".join(_model_row(r, bank_n) for r in partial)
+        rows += "".join(_model_row(r, bank_n, amap) for r in partial)
     if adversarial:
         rows += floor_rows(adversarial)
     else:
@@ -2670,13 +3003,7 @@ def render_html(ledger: dict, png_b64: str | None = None) -> str:
                            f'{len(superseded)} superseded predecessor'
                            f'{"s" if len(superseded) != 1 else ""} ({names}) '
                            f'moved to <a href="#generations">Generations</a>.')
-    by_name = {m["name"]: m for m in models}
-    for m in previous:
-        if m["name"] in replaced:
-            gens_board_note += (f' {escape(m["label"])} left the board when '
-                                f'{escape(by_name[replaced[m["name"]]]["label"])} '
-                                f'took its lab&rsquo;s slot; a different tier, so '
-                                f'not compared as a generation.')
+    gens_board_note += _replaced_note(models, previous, html=True)
     repriced_note = ""
     moved = _repriced_pairs(models)
     if moved:
@@ -2715,16 +3042,22 @@ significant: its cell shows which way it leans, and a lean does not establish eq
 {_pairwise_matrix(pairwise, ranked)}
 </section>"""
 
+    weights_section = _weights_section(ranked, pairwise)
     jump_links = ['<a href="#measure">What we measure</a>',
                   '<a href="#leaderboard">Leaderboard</a>']
     if gen_pairs:
         jump_links.append('<a href="#generations">Generations</a>')
+    # Caveats before the specialist views that depend on them.
+    jump_links.append('<a href="#limits">Limits</a>')
     if pairwise:
         jump_links.append('<a href="#headtohead">Head-to-head</a>')
+    # Secondary view: the master board above is the primary ranking.
+    if weights_section:
+        jump_links.append('<a href="#weights">Open-weight vs. closed</a>')
     jump_links.append('<a href="#history">History</a>')
     jump_nav = f'<nav class="jump">{"".join(jump_links)}</nav>'
 
-    run_date = escape(run.get("run_date") or run["run_id"])
+    run_date = escape(_run_date_text(run))
     bank_digest, bank_hash_label = _display_hash(b)
     bank_hash = escape(bank_digest)
     bank_label = escape(_bank_label(b))
@@ -2780,6 +3113,7 @@ dimension scores, so a dimension with more items can't dominate, reported with a
 <span><i style="background:var(--zai)"></i>Z.ai</span>
 <span><i style="background:var(--minimax)"></i>MiniMax</span>
 <span><i style="background:var(--mistral)"></i>Mistral</span>
+<span><i style="background:var(--reflection)"></i>Reflection</span>
 </div>
 {_score_field(ranked, run)}
 <div class="tablewrap"><table>
@@ -2799,17 +3133,19 @@ its own paired tests against the current lineup, Holm-corrected. P(#1) is how of
 highest when all models are rescored on the same resampled items; it is descriptive.
 Each model line names the Ship Sense version it was tested on.
 Per-dimension cells are weighted correctness (0&ndash;1); $/M is current list price in USD
-per 1M input/output tokens.{repriced_note}{gens_board_note}{coverage_note}</p>
+per 1M input/output tokens.{repriced_note}{_avail_note(eligible + partial, amap)}{gens_board_note}{coverage_note}</p>
 </section>
 
 {_generations_section(gen_pairs, bank_n, ranked)}
-
-{pairwise_section}
 
 <section id="limits">
 <h2>How to read it &middot; limits</h2>
 <div class="panel"><ul>{limitations}</ul></div>
 </section>
+
+{pairwise_section}
+
+{weights_section}
 
 <section id="history">
 <h2>Run history</h2>
@@ -2842,6 +3178,10 @@ Bank <code>{bank_hash}</code> ({bank_hash_label}), {bank_label}. Statistical met
 # Share card (1200x630 SVG — the og:image / LinkedIn screenshot artifact)
 # --------------------------------------------------------------------------- #
 CARD_W, CARD_H = 1200, 630
+# Baseline of the last ranked row: room for the provisional box below, or not.
+CARD_LAST_ROW_Y_PROV, CARD_LAST_ROW_Y = 468.0, 566.0
+# Row pitch at which card type renders at full size; tighter pitches scale it.
+CARD_FULL_SIZE_PITCH = 22.0
 _CARD_SERIF = "Georgia,'Times New Roman',serif"
 _CARD_SANS = "'Helvetica Neue',Helvetica,Arial,sans-serif"
 # Muted ink for secondary card text (labels, meta, captions).
@@ -2849,7 +3189,21 @@ _CARD_MUTED_INK = "#6b6457"
 _CARD_PROVIDER_NAME = {"anthropic": "Anthropic", "openai": "OpenAI", "google": "Google",
                        "xai": "xAI", "meta": "Meta", "moonshot": "Moonshot",
                        "qwen": "Qwen", "deepseek": "DeepSeek", "zai": "Z.ai",
-                       "minimax": "MiniMax", "mistral": "Mistral"}
+                       "minimax": "MiniMax", "mistral": "Mistral",
+                       "reflection": "Reflection"}
+
+
+def _card_px(size: float, k: float) -> str:
+    """A card font size scaled by k, printed as before when k is 1."""
+    return f"{round(size * k, 1):g}"
+
+
+def _card_avail(label: str | None) -> str:
+    """The availability tag on the share card: same italic serif, card inks."""
+    if not label:
+        return ""
+    return (f'<tspan dx="7" font-family="{_CARD_SERIF}" font-size="13.5" '
+            f'font-style="italic" font-weight="400" fill="{_CARD_MUTED_INK}">{label}</tspan>')
 
 
 def render_card_svg(ledger: dict) -> str:
@@ -2871,7 +3225,7 @@ def render_card_svg(ledger: dict) -> str:
     eligible = _eligible_rows(ranked)
     b = run["bank"]
     bank_n = b.get("n_items")
-    date = escape(run.get("run_date") or str(run["run_id"]))
+    date = escape(_run_date_text(run))
     floor, floor_name = floor_value(run)
 
     contenders = _contenders(ranked)
@@ -2917,6 +3271,11 @@ def render_card_svg(ledger: dict) -> str:
             return (f'<rect x="{cx - r:.1f}" y="{cy - r:.1f}" width="{2 * r:.1f}" '
                     f'height="{2 * r:.1f}" rx="1" fill="{color}"/>')
 
+        if shape == _SHAPE_TRIANGLE:
+            r = 5.6
+            return (f'<path d="M{cx:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r * .8:.1f}'
+                    f'L{cx - r:.1f} {cy + r * .8:.1f}Z" fill="{color}"/>')
+
         return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.8" fill="{color}"/>'
 
     def ci_rail(r: dict, y: float, muted: bool = False) -> str:
@@ -2934,36 +3293,44 @@ def render_card_svg(ledger: dict) -> str:
         )
 
     rows_svg = ""
-    # Fixed 31px pitch up to 9 rows (historical geometry byte-identical);
-    # beyond that, compress so the full ranked field fits the 148-490 table rect.
+    # Fixed 31px pitch up to 9 rows; beyond that, compress so the full ranked
+    # field fits the table rect. With no
+    # provisional box below, the table takes that room too (20 rows touched at
+    # the old 468 floor), and type shrinks with the pitch so lines never collide.
     row_top = 206.0
-    row_h = min(31.0, (468.0 - row_top) / max(1, len(display) - 1))
+    last_row_y = CARD_LAST_ROW_Y_PROV if provisional else CARD_LAST_ROW_Y
+    row_h = min(31.0, (last_row_y - row_top) / max(1, len(display) - 1))
+    k = min(1.0, row_h / CARD_FULL_SIZE_PITCH)
+    amap = availability()
     for i, r in enumerate(display):
         y = row_top + i * row_h
         s_ = r["score"]
         provider = (r.get("provider") or "").lower()
         provider_name = _CARD_PROVIDER_NAME.get(provider, provider.capitalize())
         rank = f'{r["pos"]}'
-        bg = '<rect x="64" y="193" width="1072" height="30" rx="4" fill="#f6efe1"/>' if i == 0 else ""
+        # The leader's row is tinted; the band follows the pitch so it covers one row.
+        bg = (f'<rect x="64" y="{y - row_h * 13 / 31:g}" width="1072" '
+              f'height="{row_h - 1:g}" rx="4" fill="#f6efe1"/>' if i == 0 else "")
         rows_svg += (
             f'{bg}'
-            f'<line x1="72" y1="{y + 18:.1f}" x2="1128" y2="{y + 18:.1f}" '
+            f'<line x1="72" y1="{y + row_h * 18 / 31:.1f}" x2="1128" y2="{y + row_h * 18 / 31:.1f}" '
             f'stroke="#ece5d7" stroke-width="1"/>'
-            f'<text x="91" y="{y:.1f}" text-anchor="end" font-family="{_CARD_SANS}" '
-            f'font-size="15" font-weight="700" fill="#4a4437">{rank}</text>'
-            f'<text x="126" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="15.5" '
-            f'font-weight="700" fill="#1c1710">{escape(r["label"])}</text>'
+            f'<text x="82" y="{y:.1f}" text-anchor="middle" font-family="{_CARD_SANS}" '
+            f'font-size="{_card_px(15, k)}" font-weight="700" fill="#4a4437">{rank}</text>'
+            f'<text x="126" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="{_card_px(15.5, k)}" '
+            f'font-weight="700" fill="#1c1710">{escape(r["label"])}'
+            f'{_card_avail(amap.get(r["name"]))}</text>'
             f'{provider_dot(provider, 438, y - 5.0)}'
-            f'<text x="450" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="13.5" '
+            f'<text x="450" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="{_card_px(13.5, k)}" '
             f'fill="{_CARD_MUTED_INK}">{escape(provider_name)}</text>'
             f'<text x="585" y="{y:.1f}" text-anchor="end" font-family="{_CARD_SANS}" '
-            f'font-size="17" font-weight="800" fill="#1c1710">{s_["value"]:.1f}</text>'
+            f'font-size="{_card_px(17, k)}" font-weight="800" fill="#1c1710">{s_["value"]:.1f}</text>'
             f'{ci_rail(r, y - 5.0)}'
-            f'<text x="900" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="13.2" '
+            f'<text x="900" y="{y:.1f}" font-family="{_CARD_SANS}" font-size="{_card_px(13.2, k)}" '
             f'fill="#4a4437">R {r["restraint"]["value"]:.2f}  H {r["honesty"]["value"]:.2f}  '
             f'C {r["conviction"]["value"]:.2f}</text>'
             f'<text x="1092" y="{y:.1f}" text-anchor="end" font-family="{_CARD_SANS}" '
-            f'font-size="13.5" font-weight="700" fill="#4a4437">{_rank_range(r)}</text>'
+            f'font-size="{_card_px(13.5, k)}" font-weight="700" fill="#4a4437">{_rank_range(r)}</text>'
         )
 
     prov_svg = ""
@@ -3004,6 +3371,8 @@ def render_card_svg(ledger: dict) -> str:
     meta = (f"RUN {date} · {b['n_items']} REAL ITEMS · "
             f"BANK {escape(bank_digest.upper())}")
     floor_part = f" · {floor_name} {floor:.1f}" if floor is not None else ""
+    # The table rect grows into the space a provisional box would use.
+    table_h = 342 if provisional else int(CARD_LAST_ROW_Y + 24 - 148)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{CARD_W}" height="{CARD_H}" viewBox="0 0 {CARD_W} {CARD_H}">
 <rect width="{CARD_W}" height="{CARD_H}" fill="#f4f2ea"/>
 <text x="70" y="54" font-family="{_CARD_SANS}" font-size="14" font-weight="800" letter-spacing="3" fill="#0f766e">SHIP SENSE</text>
@@ -3011,9 +3380,9 @@ def render_card_svg(ledger: dict) -> str:
 <text x="70" y="96" font-family="{_CARD_SERIF}" font-size="38" font-weight="700" fill="#1c1710">Product judgment leaderboard</text>
 <text x="72" y="123" font-family="{_CARD_SANS}" font-size="15" fill="{_CARD_MUTED_INK}">{subtitle}</text>
 <text x="1130" y="96" text-anchor="end" font-family="{_CARD_SANS}" font-size="38" font-weight="800" fill="{top_color}">{top_score_text}</text>
-<text x="1130" y="123" text-anchor="end" font-family="{_CARD_SANS}" font-size="14" fill="{_CARD_MUTED_INK}">#1 · {verdict}</text>
-<rect x="56" y="148" width="1088" height="342" rx="6" fill="#fffdf7" stroke="#ddd6c6"/>
-<text x="91" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">RANK</text>
+<text x="1130" y="123" text-anchor="end" font-family="{_CARD_SANS}" font-size="14" fill="{_CARD_MUTED_INK}">Highest score · {verdict}</text>
+<rect x="56" y="148" width="1088" height="{table_h}" rx="6" fill="#fffdf7" stroke="#ddd6c6"/>
+<text x="82" y="177" text-anchor="middle" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">RANK</text>
 <text x="126" y="177" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">MODEL</text>
 <text x="432" y="177" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">LAB</text>
 <text x="585" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">SCORE</text>
@@ -3048,6 +3417,64 @@ def _price_md(r: dict) -> str:
     return f"{price} †" if "price_was_in" in r else price
 
 
+def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[str]:
+    """README twin of the page section: lede, docs/weights.svg, two compact tables."""
+    open_rows, closed_rows = weights_groups(ranked, records)
+    summary = weights_summary(open_rows, closed_rows, records)
+    if not summary:
+        return []
+    amap = availability()
+    lines = ["", "### Open-weight and closed models",
+             "", "_The same board, split by whether the weights can be downloaded. "
+             "The ranked table above is the primary result._", "",
+             _weights_lede(summary, html=False), "",
+             "![Open-weight models above and closed models below on one shared score "
+             "axis; values in the tables below](docs/weights.svg)", ""]
+    # Only the open-weight table: the closed models are the main table above,
+    # and the chart already shows their in-group rank ranges.
+    lic = weights_licenses()
+    lines += ["| # | Open-weight | Ship Sense Score (95% CI) | Rank in group | $/M in/out "
+              "| Licence |", "|---|---|---|---|---|---|"]
+    for r in open_rows:
+        s = r["score"]
+        lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))} "
+                     f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
+                     f"| {_rank_range(r)} | {_price_md(r)} | {lic.get(r['name'], '—')} |")
+    lines.append("")
+    lines.append("<sub>Open-weight = the weights for this exact version could be downloaded "
+                 "on the run date under a published licence (not the same as open source, "
+                 "which also needs training code and data detail) · <i>weights due</i> = "
+                 "announced but not yet downloadable, so counted as closed · rank in group = "
+                 "95% rank confidence set from the same paired tests, Holm-corrected within "
+                 "the group · the leaders are picked by point score, so their gap describes "
+                 "this lineup, not open-weight against closed models in general.</sub>")
+    return lines
+
+
+def render_weights_svg(ledger: dict) -> str:
+    """docs/weights.svg — the open-weight/closed chart as a standalone SVG for the
+    README, built like docs/field.svg (literal colors + embedded style)."""
+    runs = ledger.get("runs", [])
+    if not runs:
+        return '<svg xmlns="http://www.w3.org/2000/svg"/>'
+    run = runs[-1]
+    current, _ = split_generations(run["models"])
+    records = _pairwise_bundle(run["run_id"])["records"]
+    open_rows, closed_rows = weights_groups(rank_with_ties(current), records)
+    svg = _weights_svg(open_rows, closed_rows)
+    if not svg:
+        return '<svg xmlns="http://www.w3.org/2000/svg"/>'
+    svg = svg.replace("var(--line)", "#e3ddce").replace("var(--card)", "#fffdf7")
+    svg = svg.replace('<svg class="field weights"',
+                      '<svg xmlns="http://www.w3.org/2000/svg" class="field weights"')
+    return svg.replace("</svg>", f"<style>{_FIELD_STANDALONE_CSS}</style></svg>")
+
+
+def _avail_md(label: str | None) -> str:
+    """README twin of the page tag: GitHub keeps <i>, so the same italic word."""
+    return f" <i>{label}</i>" if label else ""
+
+
 def render_markdown(ledger: dict) -> str:
     """The leaderboard as GitHub-flavored markdown: the share card (GitHub renders
     SVG in READMEs) + a compact table. Injected between README marker comments so
@@ -3064,7 +3491,7 @@ def render_markdown(ledger: dict) -> str:
     gen_pairs = _all_gen_pairs(runs, models, previous, pairwise)
     ranked = attach_rank_sets(rank_with_ties(current), pairwise, bundle["p_first"])
     bank_n = run["bank"].get("n_items")
-    date = run.get("run_date") or run["run_id"]
+    date = _run_date_text(run)
 
     lines = [f"![Every current-generation model's score and 95% CI, run {date}: "
              "values in the table below](docs/field.svg)", ""]
@@ -3073,13 +3500,15 @@ def render_markdown(ledger: dict) -> str:
     lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
     eligible = _eligible_rows(ranked)
     partial = [r for r in ranked if not r.get("ranked_eligible", True)]
+    amap = availability()
     for r in eligible:
         s = r["score"]
         rank = f"{r['pos']}"
         dims = " | ".join(f"{r[d]['value']:.2f}" for d in DIMENSIONS)
         price = _price_md(r)
         items = f"{r['n_items']}/{bank_n}" if bank_n else str(r["n_items"])
-        lines.append(f"| {rank} | **{r['label']}** | {r.get('bench_version') or '—'} "
+        lines.append(f"| {rank} | **{r['label']}**{_avail_md(amap.get(r['name']))} "
+                     f"| {r.get('bench_version') or '—'} "
                      f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
                      f"| {_rank_range(r)} | {_p_first_text(r)} | {dims} | {price} | {items} |")
     if partial:
@@ -3091,7 +3520,8 @@ def render_markdown(ledger: dict) -> str:
         price = _price_md(r)
         items = f"{r['n_items']}/{bank_n}" if bank_n else str(r["n_items"])
         items += " ⚠"
-        lines.append(f"| prov. | **{r['label']}** | {r.get('bench_version') or '—'} "
+        lines.append(f"| prov. | **{r['label']}**{_avail_md(amap.get(r['name']))} "
+                     f"| {r.get('bench_version') or '—'} "
                      f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] | — | — "
                      f"| {dims} | {price} | {items} |")
     adversarial = run.get("adversarial_floor") or []
@@ -3126,12 +3556,18 @@ def render_markdown(ledger: dict) -> str:
     digest, hash_label = _display_hash(run["bank"])
     gens_note = (" · superseded predecessors move to the generations table below"
                  if previous else "")
+    replaced_md = _replaced_note(models, previous, html=False).strip()
+    if replaced_md:
+        gens_note += " · " + replaced_md.rstrip(".")
     moved = _repriced_pairs(models)
     repriced_note = ""
     if moved:
         who = "; ".join(f"{label} was {was}" for label, was in moved)
         repriced_note = (f" · † = list price moved since this run scored it ({who}); "
                          "the score does not move with the price")
+    avail_note = (" · <i>preview</i> / <i>beta</i> = the vendor's pre-release label on the "
+                  "model when its answers were collected"
+                  if any(amap.get(r["name"]) for r in eligible + partial) else "")
     lines.append(f"<sub>Run {date} · {_bank_label(run['bank'])} "
                  f"(<code>{digest}</code> {hash_label}) · "
                  "# = order by point score · rank range = 95% rank confidence set from "
@@ -3141,8 +3577,10 @@ def render_markdown(ledger: dict) -> str:
                  "scored the row · ⚠ = provisional (incomplete item/check coverage or a "
                  "missing dimension; unparsed/unreturned responses stay ungraded) · "
                  f"$/M = current list price per 1M input/output tokens"
-                 f"{repriced_note}{gens_note}.</sub>")
+                 f"{repriced_note}{avail_note}{gens_note}.</sub>")
     lines += _generations_markdown(gen_pairs)
+    # Secondary view, after the master table and its generations.
+    lines += _weights_markdown(ranked, pairwise)
     return "\n".join(lines) + "\n" + _history_markdown(runs)
 
 
@@ -3202,6 +3640,7 @@ def write_pages(ledger: dict) -> None:
     (DOCS / "index.html").write_text(render_html(ledger))
     (DOCS / "card.svg").write_text(render_card_svg(ledger))
     (DOCS / "field.svg").write_text(render_field_svg(ledger))
+    (DOCS / "weights.svg").write_text(render_weights_svg(ledger))
     gens = render_generations_svg(ledger)
     if gens:
         (DOCS / "generations.svg").write_text(gens)
