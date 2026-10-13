@@ -543,6 +543,11 @@ def test_lineage_reads_a_vendors_v_prefixed_version():
     assert (5,) > (4,)
 
 
+# Labels whose vendor ships no version number at all. They can never auto-retire,
+# so a successor needs an explicit superseded_by in models.yaml.
+_UNVERSIONED_VENDOR_LABELS = {"Beam"}  # Reflection, 2026-10-12
+
+
 def test_lineage_parsing_is_unchanged_for_every_shipped_label():
     """Widening the version prefix to [kv] must not move any label already on a
     published board -- succession drives board composition, so a silent reparse
@@ -577,6 +582,8 @@ def test_lineage_parsing_is_unchanged_for_every_shipped_label():
     for entry in registry:
         label = entry.get("label")
         if not label or entry["provider"] == "mock":
+            continue
+        if label in _UNVERSIONED_VENDOR_LABELS:
             continue
         assert lb._lineage(label)[1] is not None, label
 
@@ -1002,14 +1009,15 @@ def test_bench_version_is_stamped_once_and_kept_on_merge():
 
 
 def test_labs_past_the_hue_limit_get_a_distinct_mark():
-    """Labs 10 and 11 sit past the hue limit, so identity also rides on mark
+    """Labs 10 to 12 sit past the hue limit, so identity also rides on mark
     shape: the page CSS must shape their dots and legend swatches."""
     import inspect
     for lab in lb._PROVIDER_SHAPE:
         assert f'.dot[style*="{lb._PROVIDER_INK[lab]}"]' in lb.CSS, lab
         assert f'--{lab})"]' in lb.CSS, lab
         assert f'<i style="background:var(--{lab})"></i>' in inspect.getsource(lb.render_html), lab
-    assert set(lb._PROVIDER_SHAPE) == {"minimax", "mistral"}
+    assert set(lb._PROVIDER_SHAPE) == {"minimax", "mistral", "reflection"}
+    assert len(set(lb._PROVIDER_SHAPE.values())) == len(lb._PROVIDER_SHAPE)
 
 
 def test_value_callout_names_every_model_tied_at_top_price(monkeypatch):
@@ -1073,3 +1081,42 @@ def test_rank_sets_refuse_a_p_first_from_a_different_lineup():
     with pytest.raises(ValueError, match="lineup"):
         lb.attach_rank_sets(ranked, None, {"a": 0.6, "c": 0.4})
     lb.attach_rank_sets(ranked, None, {"a": 0.6, "b": 0.4})
+
+
+def test_availability_reads_the_vendor_labels_from_the_registry():
+    amap = lb.availability()
+    assert amap == {"gemini-3.1-pro": "preview", "mistral-large-4": "preview",
+                    "muse-wonder-1.0": "preview", "beam-501b-a23b": "beta"}
+
+
+def test_availability_tag_renders_on_every_surface_and_only_when_set():
+    row_preview = {"name": "muse-wonder-1.0", "label": "Muse Wonder 1.0"}
+    assert 'class="avail"' in lb._avail_html("preview")
+    assert ">preview</abbr>" in lb._avail_html("preview")
+    assert lb._avail_html(None) == ""
+    assert lb._avail_md("beta") == " <i>beta</i>"
+    assert lb._avail_md(None) == ""
+    assert ">preview</tspan>" in lb._avail_tspan("preview")
+    assert ">preview</tspan>" in lb._card_avail("preview")
+    assert "pre-release" in lb._avail_note([row_preview], {"muse-wonder-1.0": "preview"})
+    assert lb._avail_note([row_preview], {}) == ""
+
+
+def test_chart_points_use_the_legend_mark_for_each_lab():
+    assert lb._svg_mark("anthropic", 10, 10).startswith("<circle")
+    assert lb._svg_mark("mistral", 10, 10).startswith("<rect")
+    assert lb._svg_mark("minimax", 10, 10).startswith("<path")
+    assert lb._svg_mark("reflection", 10, 10).startswith("<path")
+    assert lb._PROVIDER_INK["reflection"] in lb._svg_mark("reflection", 10, 10)
+
+
+def test_board_date_says_when_a_late_model_was_merged_in():
+    assert lb._run_date_text({"run_id": "r", "run_date": "2026-10-07"}) == "2026-10-07"
+    run = {"run_id": "r", "run_date": "2026-10-07", "updated": "2026-10-12"}
+    assert lb._run_date_text(run) == "2026-10-07, updated 2026-10-12"
+
+
+def test_card_type_size_is_unchanged_at_full_pitch():
+    assert lb._card_px(15.5, 1.0) == "15.5"
+    assert lb._card_px(15, 1.0) == "15"
+    assert lb._card_px(15, 0.5) == "7.5"

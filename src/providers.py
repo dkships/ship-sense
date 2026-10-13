@@ -49,6 +49,9 @@ API_KEY_ENV_BY_PROVIDER = {
     "zai": "ZAI_API_KEY",
     "minimax": "MINIMAX_API_KEY",
     "mistral": "MISTRAL_API_KEY",
+    # Reflection's docs name it REFLECTION_API_KEY; this repo's .env stores it as
+    # BEAM_API_KEY (added 2026-10-12).
+    "reflection": "BEAM_API_KEY",
 }
 
 
@@ -811,6 +814,8 @@ def get_provider(cfg: dict[str, Any]) -> Provider:
     if p == "zai":
         return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
     if p == "mistral":
+        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
+    if p == "reflection":
         return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
     if p == "minimax":
         return MiniMaxProvider(cfg)

@@ -36,7 +36,7 @@ sample:
 	$(PY) -m src.report --run-id sample
 
 # Live lane for vendors with no usable batch route (xAI, Meta, Moonshot, Qwen,
-# DeepSeek, Z.ai, MiniMax) — shipped defaults, gated by notes/gate_run.py before any merge.
+# DeepSeek, Z.ai, MiniMax, Reflection) — shipped defaults, gated by notes/gate_run.py before any merge.
 # Scoped like batch-prepare: the synthetic example_* items never reach the
 # leaderboard, so a paid run must not pay for them.
 live: require-models
