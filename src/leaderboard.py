@@ -2589,7 +2589,8 @@ def _generation_row(m: dict, rank: str, tag: str, note: str,
     return (f'<tr class="{cls}">'
             f'<td class="rank">{rank}<span class="gtag">{tag}</span></td>'
             f'<td class="model"><span class="dot" style="background:{color}"></span>'
-            f'<span class="mname"><span class="label">{escape(m["label"])}</span>'
+            f'<span class="mname"><span class="label">{escape(m["label"])}'
+            f'{_avail_html(availability().get(m["name"]))}</span>'
             f'<span class="provider">{sub}</span>{_coverage(m, bank_n)}</span></td>'
             f'<td class="rel">{released}</td>'
             f'{_price_cell(m)}'
@@ -2827,6 +2828,7 @@ def _generations_markdown(pairs: list[dict]) -> list[str]:
                   f"<sub>{_GENS_CAPTION}</sub>", ""]
     lines += ["| Tested on | Previous | Current | Where it moved | Paired Δ (95% CI) | Verdict |",
               "|---|---|---|---|---|---|"]
+    amap = availability()
     for p in pairs:
         prev, curr = p["prev"], p["curr"]
         glyph, _, label = _verdict_call(p).partition(" ")
@@ -2835,9 +2837,9 @@ def _generations_markdown(pairs: list[dict]) -> list[str]:
                    + (f"; {_bound_text(p)}" if _bound_text(p) else ""))
         lines.append(
             f"| {p.get('bench') or '—'} "
-            f"| {prev['label']} — {prev['score']['value']:.1f} "
+            f"| {prev['label']}{_avail_md(amap.get(prev['name']))} — {prev['score']['value']:.1f} "
             f"[{prev['score']['lo']:.1f}–{prev['score']['hi']:.1f}]<br>{_dims_md(prev)} "
-            f"| {curr['label']} — {curr['score']['value']:.1f} "
+            f"| {curr['label']}{_avail_md(amap.get(curr['name']))} — {curr['score']['value']:.1f} "
             f"[{curr['score']['lo']:.1f}–{curr['score']['hi']:.1f}]<br>{_dims_md(curr)} "
             f"| {_dim_deltas_md(p)} "
             f"| {_pair_delta_text(p)} | {verdict} |")
