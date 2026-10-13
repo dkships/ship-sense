@@ -1757,6 +1757,7 @@ padding:.34rem 0;color:var(--mut)}
 .gcard .vrow .vname{font-size:.98rem;min-width:0}
 .gcard .vrow .vname .dot{display:inline-block;width:9px;height:9px;border-radius:50%;
 margin-right:.55rem;vertical-align:.02em}
+.gcard .vrow .vname abbr.avail{display:block;margin:.1rem 0 0 calc(9px + .55rem)}
 .gcard .vrow .vscore{font:.98rem var(--mono)}
 .gcard .vrow.winner{color:var(--ink)}
 .gcard .vrow.winner .vname,.gcard .vrow.winner .vscore{font-weight:700}
@@ -2710,7 +2711,7 @@ def _matchup_card(p: dict, retired: frozenset[str] = frozenset()) -> str:
         return (f'<div class="vrow{cls}">'
                 f'<span class="vname"><span class="dot" '
                 f'style="background:{_provider_color(m.get("provider"))}"></span>'
-                f'{escape(m["label"])}</span>'
+                f'{escape(m["label"])}{_avail_html(availability().get(m["name"]))}</span>'
                 f'<span class="vtag">{tag}</span>'
                 f'<span class="vscore">{m["score"]["value"]:.1f}</span></div>')
     note = _card_note(p)
@@ -3450,8 +3451,7 @@ def render_card_svg(ledger: dict) -> str:
 <text x="432" y="177" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">LAB</text>
 <text x="585" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">SCORE</text>
 <text x="630" y="177" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">95% CI</text>
-<text x="846" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="10.5" fill="#9a917e">{scale_lo}</text>
-<text x="872" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="10.5" fill="#9a917e">{scale_hi}</text>
+<text x="872" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="10.5" fill="#9a917e">{scale_lo}&#8211;{scale_hi}</text>
 <text x="900" y="177" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">DIMENSIONS</text>
 <text x="1092" y="177" text-anchor="end" font-family="{_CARD_SANS}" font-size="11.5" font-weight="800" letter-spacing="1.2" fill="{_CARD_MUTED_INK}">RANK RANGE</text>
 <line x1="72" y1="188" x2="1128" y2="188" stroke="#ddd6c6"/>
