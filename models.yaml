@@ -546,6 +546,7 @@ models:
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2026-12-01"
+      introductory: true      # vendor-announced launch price; the board marks it
       price_in: 4
       price_out: 20
       source: "https://ai.google.dev/gemini-api/docs/pricing"
@@ -590,10 +591,11 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-09-02"
+    price_verified: "2026-10-13"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
+      introductory: true      # vendor-announced launch price; the board marks it
       price_in: 1.5
       price_out: 7.5
       source: "https://ai.google.dev/gemini-api/docs/pricing"
@@ -612,6 +614,7 @@ models:
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
+      introductory: true      # vendor-announced launch price; the board marks it
       price_in: 1.5
       price_out: 7.5
       source: "https://ai.google.dev/gemini-api/docs/pricing"
@@ -640,6 +643,7 @@ models:
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
+      introductory: true      # vendor-announced launch price; the board marks it
       price_in: 1.5
       price_out: 7.5
       source: "https://ai.google.dev/gemini-api/docs/pricing"
