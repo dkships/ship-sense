@@ -67,8 +67,9 @@ defaults:
 # nano. All declared explicitly below because the labels cannot infer them.
 # `label` is the human display name on the public leaderboard.
 # `weights` (optional): "open" = this exact version's weights downloadable under a
-# published licence (an open sibling does not count); "pending" = promised, not yet
-# downloadable, shown as closed with a "weights due" tag. Absent = closed.
+# published licence (an open sibling does not count); "pending" = released and
+# advertised as open-weight, weights not yet downloadable: grouped with open-weight
+# models, tagged "weights due" (David's call 2026-10-12). Absent = closed.
 # `weights_license` is the short licence note shown beside an open-weight model.
 # Display-only, like availability. Verified 2026-10-12 against the Hugging Face API.
 # `availability` (optional): the VENDOR'S OWN pre-release label on this model
@@ -1547,6 +1548,7 @@ models:
     provider: mistral
     id: mistral-large-4
     weights: pending             # mistral.ai/news/mistral-large-4: "Weights drop end of this month"; no HF repo 2026-10-12
+    weights_license: "Not yet named; weights due end of October 2026"
     base_url: https://api.mistral.ai/v1
     label: "Mistral Large 4"
     availability: preview        # mistral.ai/news/mistral-large-4: "public preview" (2026-10-12)
@@ -1590,6 +1592,7 @@ models:
     provider: reflection
     id: Beam-501B-A23B
     weights: pending             # reflection.ai/blog/introducing-beam: Apache 2.0 "later this month"; no HF repo 2026-10-12
+    weights_license: "Apache 2.0 announced; weights due October 2026"
     base_url: https://api.reflection.ai/openai/v1
     label: "Beam"
     availability: beta           # developers.reflection.ai/models: "during the beta" (2026-10-12)

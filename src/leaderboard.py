@@ -741,6 +741,14 @@ def _avail_tspan(label: str | None) -> str:
     return f'<tspan class="favail" dx="6">{label}</tspan>'
 
 
+def _avail_sub(label: str | None) -> str:
+    """The same tag in the grey line under the name, shown only on phones where
+    the name line has no room for it (CSS swaps the two)."""
+    if not label:
+        return ""
+    return f' <span class="avail-sub">&middot; <i class="avail">{label}</i></span>'
+
+
 def _avail_note(rows: list[dict], amap: dict[str, str]) -> str:
     """One sentence under the table naming what the tag means, only when used."""
     if not any(amap.get(r["name"]) for r in rows):
@@ -1394,7 +1402,8 @@ def _model_row(r: dict, bank_n: int | None = None,
             f'<td class="model"><span class="dot" style="background:{color}"></span>'
             f'<span class="mname"><span class="label">{escape(r["label"])}'
             f'{_avail_html((amap or {}).get(r["name"]))}</span>'
-            f'<span class="provider">{escape(_provider_name(r.get("provider")))}{_version_tag(r)}</span>'
+            f'<span class="provider">{escape(_provider_name(r.get("provider")))}'
+            f'{_avail_sub((amap or {}).get(r["name"]))}{_version_tag(r)}</span>'
             f'{_coverage(r, bank_n)}</span></td>'
             f'<td class="rel">{released}</td>'
             f'{_price_cell(r)}'
@@ -1593,6 +1602,8 @@ thead th{white-space:nowrap}
 abbr.avail{margin-left:.3rem;text-decoration:underline dotted var(--faint);
 text-underline-offset:.2em;cursor:help;white-space:nowrap}
 abbr.avail:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:2px}
+.avail-sub{display:none}
+.avail-sub .avail{font-size:.8rem}
 .model .cov{display:block;color:var(--warn);font-size:.72rem;margin-top:.12rem}
 .rel{color:var(--mut);font:.82rem/1 var(--mono);white-space:nowrap}
 .cost{color:var(--mut);font:.82rem/1 var(--mono);white-space:nowrap}
@@ -1837,7 +1848,8 @@ table:not(.hist):not(.matrix) .rank{width:2.1rem;padding-right:.4rem}
 table:not(.hist):not(.matrix) thead th{white-space:normal}
 table:not(.hist):not(.matrix) .model{min-width:0}
 table:not(.hist):not(.matrix) .model .label{white-space:nowrap}
-.model abbr.avail{display:block;margin:.1rem 0 0}
+.model abbr.avail{display:none}
+.model .avail-sub{display:inline}
 table:not(.hist):not(.matrix) .model .provider{white-space:normal}
 table:not(.hist):not(.matrix) .score{min-width:5.5rem}
 table:not(.hist):not(.matrix) td.rrange{white-space:normal}
@@ -2200,13 +2212,14 @@ def _score_field(ranked: list[dict], run: dict) -> str:
 # requires training code and data detail, which almost no frontier release meets.
 # --------------------------------------------------------------------------- #
 # `weights` in models.yaml: "open" = weights for this exact version downloadable
-# on the run date under a published licence; "pending" = the vendor has promised
-# them but they have not shipped. Absent = closed. Pending counts as CLOSED here
-# (you cannot self-host it yet) and carries a "weights due" tag.
+# on the run date under a published licence; "pending" = released and advertised
+# as open-weight, weights not yet downloadable. Absent = closed. Pending sits in
+# the open-weight group (David's call, 2026-10-12: the vendor sells it as an
+# open-weight model) and carries a "weights due" tag so nobody expects a download.
 WEIGHTS_OPEN = "open"
 WEIGHTS_PENDING = "pending"
-_WEIGHTS_DUE_TIP = ("The vendor has announced an open-weight release for this model; "
-                    "it had not shipped on the run date, so it counts as closed.")
+_WEIGHTS_DUE_TIP = ("Advertised as open-weight; the weights had not shipped on the "
+                    "run date.")
 # Geometry for the two-band chart; shares the score field's row rhythm.
 _WEIGHTS_LEFT, _WEIGHTS_RIGHT, _WEIGHTS_VW = 262, 132, 960
 _WEIGHTS_ROW_H, _WEIGHTS_TOP, _WEIGHTS_BAND_GAP = 26, 40, 30
@@ -2225,7 +2238,8 @@ def weights() -> dict[str, str]:
 def weights_licenses() -> dict[str, str]:
     """Model name -> the short licence note for an open-weight model."""
     return {name: m["weights_license"] for name, m in _display_registry().items()
-            if m.get("weights") == WEIGHTS_OPEN and m.get("weights_license")}
+            if m.get("weights") in (WEIGHTS_OPEN, WEIGHTS_PENDING)
+            and m.get("weights_license")}
 
 
 def weights_groups(ranked: list[dict], records: list[dict] | None
@@ -2241,7 +2255,7 @@ def weights_groups(ranked: list[dict], records: list[dict] | None
     for is_open in (True, False):
         members = [{k: v for k, v in r.items()
                     if k not in ("rank_lo", "rank_hi", "p_first")}
-                   for r in eligible if (wmap.get(r["name"]) == WEIGHTS_OPEN) == is_open]
+                   for r in eligible if (r["name"] in wmap) == is_open]
         groups.append(attach_rank_sets(rank_with_ties(members), records))
     return groups[0], groups[1]
 
@@ -2371,15 +2385,14 @@ def _weights_section(ranked: list[dict], records: list[dict] | None) -> str:
     svg = _weights_svg(open_rows, closed_rows)
     if not summary or not svg:
         return ""
-    pending = [r for r in closed_rows if weights().get(r["name"]) == WEIGHTS_PENDING]
+    pending = [r for r in open_rows if weights().get(r["name"]) == WEIGHTS_PENDING]
     pending_note = ""
     if pending:
         labels = [escape(r["label"]) for r in pending]
         names = (labels[0] if len(labels) == 1
                  else ", ".join(labels[:-1]) + " and " + labels[-1])
-        pending_note = (f" {names} {'has' if len(pending) == 1 else 'have'} announced "
-                        "open weights that had not shipped, so "
-                        f"{'it counts' if len(pending) == 1 else 'they count'} as closed "
+        pending_note = (f" {names} {'is' if len(pending) == 1 else 'are'} advertised as "
+                        "open-weight, but the weights had not shipped on the run date "
                         "(<i class=\"avail\">weights due</i>).")
     lic = weights_licenses()
     lic_note = "; ".join(f"{escape(r['label'])}: {escape(lic[r['name']])}"
@@ -2391,7 +2404,7 @@ def _weights_section(ranked: list[dict], records: list[dict] | None) -> str:
 <p class="wlede">{_weights_lede(summary)}</p>
 <div class="fieldwrap">{svg}
 <p class="fcap">Shared axis &middot; dot = point score &middot; whisker = 95% CI &middot; dashed rule = best open-weight score &middot; right = rank range within the group.</p></div>
-<p class="note">Open-weight means this exact version&rsquo;s weights were downloadable on the run date under a published licence. That is not open source, which also needs the training code and data.{pending_note} Group rank ranges use the main board&rsquo;s paired tests, Holm-corrected within the group. The leaders are picked by point score, so their gap describes this lineup, not open-weight models in general.{lic_note}</p>
+<p class="note">Open-weight means this exact version&rsquo;s weights are published under an open licence, or the vendor sells it as open-weight with the weights due. That is not open source, which also needs the training code and data.{pending_note} Group rank ranges use the main board&rsquo;s paired tests, Holm-corrected within the group. The leaders are picked by point score, so their gap describes this lineup, not open-weight models in general.{lic_note}</p>
 </section>"""
 
 
@@ -3423,9 +3436,9 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
     summary = weights_summary(open_rows, closed_rows, records)
     if not summary:
         return []
-    amap = availability()
+    amap, wmap = availability(), weights()
     lines = ["", "### Open-weight and closed models",
-             "", "_The same board, split by whether the weights can be downloaded. "
+             "", "_The same board, split by whether the model is open-weight. "
              "The ranked table above is the primary result._", "",
              _weights_lede(summary, html=False), "",
              "![Open-weight models above and closed models below on one shared score "
@@ -3437,14 +3450,15 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
               "| Licence |", "|---|---|---|---|---|---|"]
     for r in open_rows:
         s = r["score"]
-        lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))} "
+        due = " <i>weights due</i>" if wmap.get(r["name"]) == WEIGHTS_PENDING else ""
+        lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))}{due} "
                      f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
                      f"| {_rank_range(r)} | {_price_md(r)} | {lic.get(r['name'], '—')} |")
     lines.append("")
-    lines.append("<sub>Open-weight = the weights for this exact version could be downloaded "
-                 "on the run date under a published licence (not the same as open source, "
-                 "which also needs training code and data detail) · <i>weights due</i> = "
-                 "announced but not yet downloadable, so counted as closed · rank in group = "
+    lines.append("<sub>Open-weight = the weights for this exact version are published under "
+                 "an open licence (not the same as open source, which also needs training "
+                 "code and data detail) · <i>weights due</i> = released and advertised as "
+                 "open-weight, weights not yet downloadable on the run date · rank in group = "
                  "95% rank confidence set from the same paired tests, Holm-corrected within "
                  "the group · the leaders are picked by point score, so their gap describes "
                  "this lineup, not open-weight against closed models in general.</sub>")
