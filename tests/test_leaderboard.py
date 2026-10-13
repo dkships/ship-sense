@@ -373,6 +373,9 @@ def test_generation_rows_carry_the_vendor_preview_tag():
     row = section[section.index('<span class="label">Gemini 3.1 Pro'):][:400]
     assert '<abbr class="avail"' in row
 
+    card = section[section.index('></span>Gemini 3.1 Pro'):][:300]
+    assert '<abbr class="avail"' in card
+
 
 def test_intro_step_needs_the_introductory_flag_and_a_future_date():
     """Only a vendor-announced launch price gets the intro mark: a price_pending
