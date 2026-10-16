@@ -1614,15 +1614,20 @@ models:
   # PRICE: no rate card published (docs, blog, and the console all silent on
   # 2026-10-12), so price_in/price_out are unset and the run cost reads unknown.
   # Key: BEAM_API_KEY in .env (Reflection's docs call it REFLECTION_API_KEY).
-  # LABEL: Reflection gives Beam no version number, so the label carries none and
-  # can never auto-retire; a future Beam needs an explicit superseded_by.
+  # LABEL: Beam had no version number until the 2026-10-16 weights release named it
+  # Beam-1.0-501B-A23B (David: rename to "Beam 1.0"), so a later Beam can now
+  # auto-retire it by label like any other versioned line.
   - name: beam-501b-a23b
     provider: reflection
     id: Beam-501B-A23B
-    weights: pending             # reflection.ai/blog/introducing-beam: Apache 2.0 "later this month"; no HF repo 2026-10-12
-    weights_license: "Apache 2.0 announced; weights due October 2026"
+    # Weights shipped 2026-10-16 (reflection.ai/blog/beam-is-available): ungated
+    # Apache 2.0 at huggingface.co/reflection/Beam-1.0-501B-A23B (+ FP8, NVFP4).
+    # Same model: the API now also answers to Beam-1.0-501B-A23B, and GET /models
+    # on this key still lists Beam-501B-A23B with the same `created` (2026-10-05).
+    weights: open                # 188 safetensors, ungated, license:apache-2.0 (checked 2026-10-16)
+    weights_license: "Apache 2.0"
     base_url: https://api.reflection.ai/openai/v1
-    label: "Beam"
+    label: "Beam 1.0"
     availability: beta           # developers.reflection.ai/models: "during the beta" (2026-10-12)
     released: "2026-10-05"       # reflection.ai/blog/introducing-beam; /models `created` 2026-10-05
     api: chat_completions
