@@ -34,6 +34,17 @@ def test_negated_conclusion_is_not_a_false_alarm():
     assert _fa(hedge)["loyalty"] is True  # warning against it = correct
 
 
+def test_contracted_negation_is_not_a_false_alarm():
+    # "can't" / "don't" / "isn't" / "doesn't" (straight or curly apostrophe) negate
+    # exactly like "cannot" / "do not": the look-back must not keep the apostrophe
+    # token whole and miss the negator list.
+    for text in ("we can't call these loyal customers yet",
+                 "we don't know these are loyal customers",
+                 "it isn't clear these are loyal customers",
+                 "the data doesn’t show these are loyal customers"):
+        assert _fa({"conclusions": [text]})["loyalty"] is True, text
+
+
 def test_asserted_conclusion_is_a_false_alarm():
     assertion = {"limitations": [], "conclusions": ["these are loyal customers"]}
     assert _fa(assertion)["loyalty"] is False  # asserting it = penalised

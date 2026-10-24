@@ -1112,6 +1112,44 @@ models:
                                  # control kimi-k2.6 accepted
     price_verified: "2026-08-24"
     price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
+    superseded_by: kimi-k3.1-pro  # Moonshot's next flagship, same single slot (2026-10-23)
+
+  # Kimi K3.1 Pro — launched 2026-10-23 (kimi.ai/blog/kimi-k3-1-pro), added the
+  # same day. "A post-trained version of Kimi K3" and "the first model in our new
+  # K3.1 series". It takes K3's single Moonshot slot, the Argon precedent (a new
+  # flagship replaces its predecessor via superseded_by). Labels cannot infer it:
+  # _lineage reads ("kimi", (3,)) vs ("kimi pro", (3, 1)), hence the explicit
+  # superseded_by on kimi-k3 above.
+  # GET /models on our key (2026-10-23): kimi-k3.1-pro, created 2026-10-23,
+  # reasoning type "only" (thinking cannot be disabled), default effort max,
+  # 1,048,576 context. Shipped default = no reasoning_effort sent.
+  # kimi-k3.1-pro-highspeed is NOT scored: Moonshot sells it as the same model at
+  # "2-3x the speed" for double the price ($4/$20), a serving tier rather than a
+  # different checkpoint (the Muse Spark Contributor-tier reasoning).
+  # Weights "will be released by Nov 4, 2026" -> weights: pending, in the
+  # open-weight group tagged "weights due" (David's 2026-10-12 ruling); flip to
+  # open + licence when the HF repo appears.
+  # Config copies kimi-k3's, which follows Moonshot's thinking-model docs
+  # (stream, >=16k cap, long timeout, reasoning_content round-trip).
+  - name: kimi-k3.1-pro
+    provider: moonshot
+    id: kimi-k3.1-pro
+    weights: pending             # kimi.ai/blog/kimi-k3-1-pro: "Full model weights will be released by Nov 4, 2026"
+    weights_license: "Not yet named; weights due by 2026-11-04"
+    base_url: https://api.moonshot.ai/v1
+    label: "Kimi K3.1 Pro"
+    released: "2026-10-23"       # kimi.ai/blog/kimi-k3-1-pro; GET /models created 2026-10-23
+    price_in: 2
+    price_out: 10
+    price_cached_in: 0.20        # same cache model as kimi-k3
+    api: chat_completions
+    structured_outputs: true     # json_schema strict per the K3.1 Pro quickstart
+    stream: true
+    max_tokens: 32768
+    timeout_s: 600
+    batch_supported: false       # Batch docs list kimi-k2.7-code + kimi-k2.6 only (2026-10-23)
+    price_verified: "2026-10-23"
+    price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
 
   # --- Qwen (Alibaba) — 7th lab, added 2026-08-03 (launch day) ---
   # Model Studio INTERNATIONAL (Singapore). Like xAI/Meta/Moonshot, one frontier
