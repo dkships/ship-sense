@@ -366,7 +366,7 @@ def test_generation_rows_carry_the_vendor_preview_tag():
     ledger = lb.load_ledger()
     md = lb.render_markdown(ledger)
     gens = md[md.index("### Current vs. previous generations"):]
-    assert "| Gemini 3.1 Pro <i>preview</i> — 82.5" in gens
+    assert "| Gemini 3.1 Pro <i>preview</i> — 82.6" in gens
 
     html = lb.render_html(ledger)
     section = html[html.index('id="generations"'):]

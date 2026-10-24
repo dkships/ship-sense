@@ -93,6 +93,7 @@ _NEGATORS = frozenset((
 _NEGATOR_PHRASES = ("rather than", "instead of", "too early to", "no evidence",
                     "can not", "would not", "should not")
 _NEG_WINDOW = 4  # words of look-back
+_CONTRACTED_NOT = "n't"
 
 
 def _negated(haystack: str, idx: int) -> bool:
@@ -100,8 +101,10 @@ def _negated(haystack: str, idx: int) -> bool:
     prefix = haystack[:idx]
     if any(p in prefix[-30:] for p in _NEGATOR_PHRASES):
         return True
-    words = re.findall(r"[a-z']+", prefix)
-    return any(w in _NEGATORS for w in words[-_NEG_WINDOW:])
+    words = re.findall(r"[a-z'’]+", prefix)
+    # A contraction keeps its apostrophe ("can't"), so match the n't ending too.
+    return any(w in _NEGATORS or w.replace("’", "'").endswith(_CONTRACTED_NOT)
+               for w in words[-_NEG_WINDOW:])
 
 
 def _alias_pattern(alias: str) -> str:
