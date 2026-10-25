@@ -65,16 +65,16 @@ class Provider:
     cfg: dict[str, Any] = {}
 
     def chat(self, messages: list[dict], *, json_mode: bool = True,
-             temperature: float = 0.7, max_tokens: int = 2048,
+             max_tokens: int = 2048,
              item: dict | None = None, turn: dict | None = None,
              schema: str | None = None) -> str:
         raise NotImplementedError
 
     def chat_result(self, messages: list[dict], *, json_mode: bool = True,
-                    temperature: float = 0.7, max_tokens: int = 2048,
+                    max_tokens: int = 2048,
                     item: dict | None = None, turn: dict | None = None,
                     schema: str | None = None, run_mode: str = "live") -> "ProviderResult":
-        text = self.chat(messages, json_mode=json_mode, temperature=temperature,
+        text = self.chat(messages, json_mode=json_mode,
                          max_tokens=max_tokens, item=item, turn=turn, schema=schema)
         return ProviderResult(
             text=text,
@@ -199,6 +199,9 @@ def estimate_cost_usd(cfg: dict[str, Any], usage: dict,
                  / 1_000_000 * discount, 8)
 
 
+PANEL_REVIEW_SHAPE = "panel_review"
+
+
 def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
     """JSON Schema for model output: structural (which fields), not value-forcing
     (no enums on the calls). Every object lists all properties in `required` and sets
@@ -225,6 +228,21 @@ def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
                 "conclusions": {"type": "array", "items": {"type": "string"}},
             },
             "required": ["limitations", "conclusions"],
+            "additionalProperties": False,
+        }
+    if shape == PANEL_REVIEW_SHAPE and item and item.get("problems"):
+        # One verdict per problem key ("P1", "P2", ...): the reviewer panel's
+        # reply (NEXT_VERSION §4d). `item` here is {"problems": [keys]}.
+        verdict = {
+            "type": "object",
+            "properties": {"named": {"type": "boolean"}, "evidence": {"type": "string"}},
+            "required": ["named", "evidence"],
+            "additionalProperties": False,
+        }
+        return {
+            "type": "object",
+            "properties": {key: verdict for key in item["problems"]},
+            "required": list(item["problems"]),
             "additionalProperties": False,
         }
     if shape == "restraint" and item and item.get("features"):
@@ -286,7 +304,7 @@ class MockProvider(Provider):
         self.name = f"mock-{variant}"
         self.cfg = {"provider": "mock", "id": variant}
 
-    def chat(self, messages, *, json_mode=True, temperature=0.7,
+    def chat(self, messages, *, json_mode=True,
              max_tokens=2048, item=None, turn=None, schema=None) -> str:
         if item is None:
             return json.dumps({"note": "mock: no item context"})
@@ -344,9 +362,9 @@ class _SDKProvider(Provider):
     `chat_result`. (Not on `Provider` itself — the base `chat_result` calls
     `self.chat` for MockProvider, which would recurse.)"""
 
-    def chat(self, messages, *, json_mode=True, temperature=0.7,
+    def chat(self, messages, *, json_mode=True,
              max_tokens=2048, item=None, turn=None, schema=None) -> str:
-        return self.chat_result(messages, json_mode=json_mode, temperature=temperature,
+        return self.chat_result(messages, json_mode=json_mode,
                                 max_tokens=max_tokens, item=item, turn=turn,
                                 schema=schema).text
 
@@ -356,7 +374,7 @@ class AnthropicProvider(_SDKProvider):
         self.cfg = cfg
         self.name = cfg["name"]
 
-    def chat_result(self, messages, *, json_mode=True, temperature=0.7,
+    def chat_result(self, messages, *, json_mode=True,
                     max_tokens=2048, item=None, turn=None, schema=None,
                     run_mode: str = "live") -> ProviderResult:
         import anthropic  # lazy
@@ -435,7 +453,7 @@ class OpenAICompatProvider(_SDKProvider):
         self.name = cfg["name"]
         self.api_key_env = api_key_env
 
-    def chat_result(self, messages, *, json_mode=True, temperature=0.7,
+    def chat_result(self, messages, *, json_mode=True,
                     max_tokens=2048, item=None, turn=None, schema=None,
                     run_mode: str = "live") -> ProviderResult:
         import openai  # lazy
@@ -634,7 +652,7 @@ class MiniMaxProvider(_SDKProvider):
             delay = min(delay * 2, _MINIMAX_BACKOFF_MAX_S)
         raise AssertionError("unreachable")
 
-    def chat_result(self, messages, *, json_mode=True, temperature=0.7,
+    def chat_result(self, messages, *, json_mode=True,
                     max_tokens=2048, item=None, turn=None, schema=None,
                     run_mode: str = "live") -> ProviderResult:
         import openai  # lazy
@@ -718,10 +736,9 @@ class GoogleProvider(_SDKProvider):
             return None
         return _typed_from_json_schema(spec, types)
 
-    def chat_result(self, messages, *, json_mode=True, temperature=0.7,
+    def chat_result(self, messages, *, json_mode=True,
                     max_tokens=2048, item=None, turn=None, schema=None,
                     run_mode: str = "live") -> ProviderResult:
-        import time
         from google import genai  # lazy
         from google.genai import types
         client = genai.Client(api_key=os.environ[API_KEY_ENV_BY_PROVIDER["google"]])
@@ -753,7 +770,6 @@ class GoogleProvider(_SDKProvider):
         # off with exponential delay + jitter on all three. Only a per-DAY 429 won't
         # recover this session, so fail fast on that (else every later item wastes
         # the full backoff before skipping).
-        import random
         delay = 4.0
         for attempt in range(6):
             try:
@@ -792,6 +808,13 @@ class GoogleProvider(_SDKProvider):
                 raise
 
 
+# Labs served by OpenAI's SDK against their own base_url (models.yaml).
+OPENAI_COMPATIBLE_PROVIDERS = frozenset({
+    "openai", "xai", "meta", "moonshot", "qwen", "deepseek", "zai", "mistral",
+    "reflection",
+})
+
+
 def get_provider(cfg: dict[str, Any]) -> Provider:
     """Factory keyed on the registry's `provider` field."""
     p = cfg["provider"]
@@ -799,23 +822,7 @@ def get_provider(cfg: dict[str, Any]) -> Provider:
         return MockProvider(cfg["id"])
     if p == "anthropic":
         return AnthropicProvider(cfg)
-    if p == "openai":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "xai":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "meta":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "moonshot":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "qwen":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "deepseek":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "zai":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "mistral":
-        return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
-    if p == "reflection":
+    if p in OPENAI_COMPATIBLE_PROVIDERS:
         return OpenAICompatProvider(cfg, API_KEY_ENV_BY_PROVIDER[p])
     if p == "minimax":
         return MiniMaxProvider(cfg)

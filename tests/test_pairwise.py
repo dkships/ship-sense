@@ -34,6 +34,16 @@ def test_compare_covers_each_pair_once_and_names_the_winner():
     assert by[("a", "c")]["lo"] > 0                      # CI excludes zero
 
 
+def test_compare_in_worker_processes_matches_one_process():
+    per = {"a": _model([1] * 12 + [0] * 4),
+           "b": _model([1] * 8 + [0] * 8),
+           "c": _model([0, 1] * 8)}
+    order = ["a", "b", "c"]
+    serial = pairwise.compare(per, order, n=300, seed=0)
+    parallel = pairwise.compare(per, order, n=300, seed=0, workers=2)
+    assert parallel == serial
+
+
 def test_compare_reports_no_difference_rather_than_a_coin_flip_winner():
     same = [1, 0, 1, 0, 1, 0]
     per = {"a": _model(same), "b": _model(same)}
@@ -167,6 +177,25 @@ def test_late_succession_is_its_own_family(monkeypatch):
     assert pairs[frozenset(("old2", "new2"))]["group"] == "added:old2->new2"
     assert pairs[frozenset(("new2", "old"))]["group"] == "added:new2 vs old"
     assert [u.get("prev") for u in untested] == ["gone"]
+
+
+def test_exploratory_only_models_form_no_confirmatory_succession(monkeypatch):
+    # Older models measured for a progression chart are registered as exploratory
+    # only: a succession involving one must not become a confirmatory family.
+    monkeypatch.setattr(pairwise.leaderboard, "successions",
+                        lambda rows: {"old": "new", "older": "old", "x": "y"})
+    scores = {n: (80.0, 0, 0) for n in ("older", "old", "new", "x", "y")}
+    family = {"successions": [{"prev": "old", "curr": "new"}], "claims": [],
+              "exploratory_only": ["older", "x"]}
+    pairs, _ = pairwise.confirmatory_pairs(list(scores), scores, family)
+    assert set(pairs) == {frozenset(("old", "new"))}
+
+
+def test_load_families_reads_exploratory_only(tmp_path):
+    path = tmp_path / "h.yaml"
+    path.write_text("versions:\n  v9:\n    exploratory_only: [a, b]\n"
+                    "    confirmatory:\n      successions: all\n")
+    assert pairwise.load_families("v9", path)["exploratory_only"] == ["a", "b"]
 
 
 def test_legacy_all_rule_keeps_one_family(monkeypatch):

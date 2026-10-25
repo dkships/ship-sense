@@ -191,6 +191,34 @@ def test_dimension_structure_needs_enough_models_and_spread():
     assert stats.dimension_structure(flat, min_models=5) == {}    # no spread to correlate
 
 
+def _lattice_p_reference(coefficients):
+    # The pre-buffer algorithm: a fresh copy of the running distribution at
+    # every step. The buffered version must match it bit for bit.
+    import numpy as np
+    weights = [abs(int(c)) for c in coefficients if c]
+    observed = abs(sum(int(c) for c in coefficients if c))
+    if not observed:
+        return 1.0
+    total = sum(weights)
+    probs = np.zeros(total + 1)
+    probs[0] = 1.0
+    end = 1
+    for weight in weights:
+        moved = probs[:end].copy()
+        probs[:end] *= 0.5
+        probs[weight:end + weight] += 0.5 * moved
+        end += weight
+    return min(1.0, 2 * float(probs[:(total - observed) // 2 + 1].sum()))
+
+
+def test_lattice_p_is_bit_identical_to_the_unbuffered_algorithm():
+    rng = random.Random(20261025)
+    for _ in range(200):
+        coefficients = [rng.choice([-1, 1]) * rng.randint(0, 60)
+                        for _ in range(rng.randint(1, 40))]
+        assert stats._lattice_p(coefficients) == _lattice_p_reference(coefficients)
+
+
 def test_exact_p_handles_more_than_63_discordant_items():
     # The uint64 subset-count lattice overflowed past 63 non-zero items and the
     # guard raised instead; the v3.6 board already reached 62. 70 unit items

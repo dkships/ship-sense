@@ -25,6 +25,13 @@ and `notes/v4.0-2026-09-22/SPEC.md` §8).
   `candidate_page`'s frozen historical output is still committed at
   `docs/history/v3.5/candidate*`; `archive/tests/test_candidate_page.py` checks
   that renderer output still matches that frozen record.
+- **`judge_audit.py`** (`archive/src/`, tests in `archive/tests/`) — a model-jury
+  audit (blinded judge requests, flag records) built 2026-07 and never run on a
+  real case. Its job was taken by the registered cross-lab reviewer panel
+  (`panel_batch.py` / `panel_validate.py`). It never changed a score.
+- **`findings.py`** (`archive/src/`) — per-model over-ship / over-refuse tally of
+  Restraint misses. It predates list-valued Restraint labels, so it fails on the
+  v4.6 bank (`AttributeError` on a list label); no published number depends on it.
 - **`archive/scripts/check_workflow_site.py`** — a Playwright smoke-check for
   the workflow-draft site. `playwright` isn't in `requirements*.txt`; never
   wired to a Makefile target.

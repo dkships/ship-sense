@@ -32,7 +32,6 @@ OFFICIAL_DOCS = {
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 MISTRAL_CHAT_ENDPOINT = "/v1/chat/completions"
 MISTRAL_TERMINAL = {"SUCCESS", "FAILED", "TIMEOUT_EXCEEDED", "CANCELLED"}
-MISTRAL_SUCCESS = "SUCCESS"
 
 # Bound every request this module makes on a client it built itself. A batch
 # lifecycle is long and mostly idle, so a socket can die between polls -- the
@@ -112,10 +111,6 @@ def _split_system(messages: list[dict]) -> tuple[str | None, list[dict]]:
     return system, [m for m in messages if m["role"] != "system"]
 
 
-def _user_prompt(item: dict) -> str:
-    return run._user_prompt(item)
-
-
 def _turn_order(item: dict) -> list[str]:
     if item["type"] != "conviction":
         return ["response"]
@@ -131,12 +126,12 @@ def build_messages(item: dict, turn_id: str, raw_entry: Any | None = None) -> li
     if item["type"] != "conviction":
         return [
             {"role": "system", "content": run.SYSTEM},
-            {"role": "user", "content": _user_prompt(item)},
+            {"role": "user", "content": run._user_prompt(item)},
         ]
 
     messages = [
         {"role": "system", "content": run.SYSTEM},
-        {"role": "user", "content": item["setup_prompt"]},
+        {"role": "user", "content": run._conviction_turn(item["setup_prompt"])},
     ]
     if turn_id == "setup":
         return messages
@@ -144,7 +139,7 @@ def build_messages(item: dict, turn_id: str, raw_entry: Any | None = None) -> li
         raise ValueError(f"{item['id']} needs setup before {turn_id}")
     messages.append({"role": "assistant", "content": raw_entry["setup"]})
     for turn in item.get("turns", []):
-        messages.append({"role": "user", "content": turn["content"]})
+        messages.append({"role": "user", "content": run._conviction_turn(turn["content"])})
         if turn["id"] == turn_id:
             return messages
         if not raw_entry.get(turn["id"]):
@@ -216,9 +211,6 @@ def _get_value(obj: Any, *path: str) -> Any:
                 cur = data.get(camel)
         else:
             cur = getattr(cur, part, None)
-            if cur is None and "_" in part:
-                camel = "".join([part.split("_")[0], *[p.title() for p in part.split("_")[1:]]])
-                cur = getattr(cur, camel, None)
     return cur
 
 
@@ -579,7 +571,8 @@ def _result_from_line(provider: str, cfg: dict, line: dict) -> tuple[str, provid
         return cid, providers.ProviderResult(
             text=_gemini_text(response),
             provider="google",
-            model=cfg["id"],
+            # The version the job resolved to, like the other labs' `model` field.
+            model=response.get("modelVersion") or cfg["id"],
             run_mode="batch",
             request_id=response.get("responseId") or response.get("response_id"),
             finish_reason=_gemini_finish_reason(response),
@@ -590,6 +583,13 @@ def _result_from_line(provider: str, cfg: dict, line: dict) -> tuple[str, provid
     if provider == "mistral":
         return _mistral_result(cfg, line)
     raise ValueError(f"unknown provider {provider!r}")
+
+
+def read_result_line(provider: str, cfg: dict,
+                     line: dict) -> tuple[str, providers.ProviderResult]:
+    """(request id, result) for one provider-native batch output line. The
+    entry point for batch clients outside the board run (the reviewer panel)."""
+    return _result_from_line(provider, cfg, line)
 
 
 def _mistral_content(content: Any) -> tuple[str, str | None]:
@@ -613,12 +613,26 @@ def _mistral_content(content: Any) -> tuple[str, str | None]:
     return "".join(answer), ("".join(reasoning) or None)
 
 
+def _mistral_body(body: Any) -> dict:
+    """A result line's `body` as a dict. Error-file lines can carry it as a JSON
+    string (a 503 on 2026-10-24); anything unparseable is kept under "raw"."""
+    if isinstance(body, dict):
+        return body
+    if isinstance(body, str):
+        try:
+            parsed = json.loads(body)
+        except json.JSONDecodeError:
+            return {"raw": body}
+        return parsed if isinstance(parsed, dict) else {"raw": body}
+    return {}
+
+
 def _mistral_result(cfg: dict, line: dict) -> tuple[str, providers.ProviderResult]:
     """One Mistral batch output line: {custom_id, response: {status_code, body},
     error}. `body` is an ordinary chat completion."""
     cid = line["custom_id"]
     response = line.get("response") or {}
-    body = response.get("body") or {}
+    body = _mistral_body(response.get("body"))
     status = response.get("status_code", 200)
     if line.get("error") or status >= 400 or not body.get("choices"):
         return cid, providers.ProviderResult(
@@ -663,15 +677,13 @@ def _merge_trace(run_id: str, model_name: str, item: dict, generation: int,
     path = _trace_path(run_id, model_name, item["id"])
     path.parent.mkdir(parents=True, exist_ok=True)
     traces = _load_json(path, [])
+    result.parse_ok = bool(grade.parse_json(result.text))
+    _ensure_generation(traces, generation, dict)
     if item["type"] == "conviction":
-        result.parse_ok = bool(grade.parse_json(result.text)) if result.text else False
-        _ensure_generation(traces, generation, dict)
         if not isinstance(traces[generation], dict):
             traces[generation] = {}
         traces[generation][turn_id] = result.to_json()
     else:
-        result.parse_ok = bool(grade.parse_json(result.text)) if result.text else False
-        _ensure_generation(traces, generation, dict)
         traces[generation] = result.to_json()
     path.write_text(json.dumps(traces, indent=2))
 
@@ -921,29 +933,17 @@ def download_mistral(job_file: Path, output: Path | None = None,
     return written
 
 
-def submit_gemini(manifest_path: Path, client: Any | None = None,
-                  types_mod: Any | None = None) -> Path:
+def submit_gemini(manifest_path: Path, client: Any | None = None) -> Path:
+    from google.genai import types
     if client is None:
-        from google.genai import types
         client = _gemini_client()
-        types_mod = types
-    elif types_mod is None:
-        try:
-            from google.genai import types
-            types_mod = types
-        except ImportError:
-            class _Types:
-                @staticmethod
-                def UploadFileConfig(**kwargs):
-                    return kwargs
-            types_mod = _Types
     manifest = json.loads(manifest_path.read_text())
     if manifest["provider"] != "google":
         raise ValueError("submit-gemini requires a Google/Gemini manifest")
     req_file = ROOT / manifest["requests_file"]
     uploaded = client.files.upload(
         file=str(req_file),
-        config=types_mod.UploadFileConfig(
+        config=types.UploadFileConfig(
             display_name=f"ship-sense-{manifest['model_name']}-{manifest['stage_id']}",
             mime_type="jsonl",
         ),
