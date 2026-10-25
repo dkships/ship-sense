@@ -7,7 +7,7 @@ WORKERS ?= 4
 # A registry entry is a catalog record, not authorization to rerun that model.
 MODELS ?=
 
-.PHONY: require-models venv install install-live test sample live batch-prepare complete-check finalize refresh report pairwise regrade leaderboard card kappa bank-audit judge-audit-template publish-check export-public gates
+.PHONY: require-models venv install install-live test sample live batch-prepare complete-check finalize refresh report pairwise regrade leaderboard card kappa bank-audit publish-check export-public gates
 # Headless Chrome (any channel) for SVG -> PNG share-card conversion.
 CHROME ?= $(shell ls "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
         "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta" \
@@ -42,7 +42,7 @@ sample:
 live: require-models
 	./scripts/with_env.sh $(PY) -m src.run --models $(MODELS) --run-id $(RUN_ID) --workers $(WORKERS) --run-mode live --case-scope official_real_only && \
 	$(PY) -m src.report --run-id $(RUN_ID)
-	@echo "Done -> outputs/$(RUN_ID)/scorecard.md + leaderboard.png + audit.csv"
+	@echo "Done -> outputs/$(RUN_ID)/scorecard.md + audit.csv"
 
 # The retired refresh command stays an explicit error: re-running a published
 # model resamples its answers. Add a model under its own RUN_ID instead.
@@ -118,11 +118,6 @@ bank-audit:
 # something other than case reasoning. No API spend.
 gates:
 	$(PY) -m src.adversarial
-
-# Creates outputs/<run>/judge_audit_template.jsonl for a blinded multi-model audit.
-# It does not change official scores; judges can only flag records for review.
-judge-audit-template:
-	$(PY) -m src.judge_audit --run-id $(RUN_ID) --case-scope official_real_only
 
 # Preflight every publish gate that can be checked mechanically (privacy,
 # drift, tests, license). Does NOT push anything.

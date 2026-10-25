@@ -2,6 +2,5 @@
 # Requires Python 3.10+.
 # For a live cross-lab run, also install requirements-live.txt (or `make install-live`).
 numpy>=1.26
-matplotlib>=3.8
 pyyaml>=6.0
 pytest>=8.0

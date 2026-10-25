@@ -5,7 +5,7 @@ import argparse
 from collections import Counter
 import json
 
-from . import grade, leaderboard, loader, report
+from . import grade, leaderboard, loader, panel_grade, report
 from .report import DIMENSIONS
 
 ROOT = leaderboard.ROOT
@@ -66,11 +66,15 @@ def _check_key(row: dict) -> tuple[str, str, str]:
     return row["item"], row["dimension"], row["sub"]
 
 
-def _grade_raw_generation(item: dict, entry: object) -> list[dict] | None:
+def _grade_raw_generation(item: dict, entry: object, grade_fn=None) -> list[dict] | None:
+    """`grade_fn(item, raw)` defaults to the deterministic grader; a run graded
+    with frozen reviewer-panel verdicts passes its panel grader."""
     try:
-        rows = grade.grade_item(item, entry)
+        rows = grade_fn(item, entry) if grade_fn else grade.grade_item(item, entry)
         expected = leaderboard._expected_checks(item)
         observed = [_check_key(row) for row in rows]
+    except panel_grade.PanelVerdictError:
+        raise
     except Exception:
         return None
     if len(observed) != len(expected) or set(observed) != expected:
@@ -90,8 +94,10 @@ def _score_coverage_complete(results: list[dict], expected: set[tuple[str, str, 
     return observed == intended
 
 
-def _scored_value(row: dict) -> tuple[str, str, str, bool, float]:
-    return (*_check_key(row), bool(row["correct"]), float(row["weight"]))
+def _scored_value(row: dict) -> tuple[str, str, str, float, float]:
+    # Exact credit, not truthiness: partial credit (Conviction, panel landmines)
+    # of 0.5 and 1.0 are different scores.
+    return (*_check_key(row), float(row["correct"]), float(row["weight"]))
 
 
 def completeness_errors(run_id: str, model_names: list[str],
@@ -140,6 +146,7 @@ def completeness_errors(run_id: str, model_names: list[str],
             errors.append("run metadata: saved evaluation fingerprint does not match")
 
     waivers = truncation_waivers(run_id)
+    grader = panel_grade.run_grader(run_id)
     for name, results in selected.items():
         cfg = by_name[name]
         generations = (1 if cfg["provider"] == "mock"
@@ -174,8 +181,10 @@ def completeness_errors(run_id: str, model_names: list[str],
             if not isinstance(traces, list):
                 traces = []
             for generation in range(generations):
+                grade_fn = (lambda it, entry, model=name, gen=generation:
+                            grader(model, it, gen, entry))
                 graded = (None if generation >= len(raw)
-                          else _grade_raw_generation(item, raw[generation]))
+                          else _grade_raw_generation(item, raw[generation], grade_fn))
                 if graded is None:
                     incomplete += 1
                 else:

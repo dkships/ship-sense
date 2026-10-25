@@ -1,7 +1,8 @@
 # Model registry — the lab-agnostic layer.
 # Add a new frontier model here and the harness runs it with no code change
-# (true for anthropic/openai/google/xai/meta; a NEW lab also needs a get_provider
-# branch and a leaderboard ink/name entry).
+# (true for anthropic/openai/google/xai/meta; a NEW lab also needs an entry in
+# providers.OPENAI_COMPATIBLE_PROVIDERS (or its own adapter) and a leaderboard
+# ink/name entry).
 # IDs / prices verified per model — see each entry's price_verified. The most
 # recent FULL sweep is 2026-08-24 (below); 2026-07-31 was the one before it.
 # The board shows the CURRENT price and daggers anything repriced since the run
@@ -84,6 +85,12 @@ defaults:
 # "Public Preview", Muse Wonder 1.0 "in preview", Beam "beta". No label changed inside a
 # window. DeepSeek V4 Pro went GA on 2026-08-13 and Gemini 3.8 Flash launched GA on
 # 2026-09-02, both before any of their answers; GPT-6 Astra carried no API label.
+# `api_retired` (optional): ISO date the provider stopped serving this model to this key (a
+# shutdown, or an access cutoff). A model scored on an earlier version that carries it cannot be
+# re-run; the progression chart (src/progression.py) says so instead of calling it merely unrun.
+# 2026-10-24: 17 older entries re-checked against each provider's own pages and 16 added for the
+# v4.6 progression run (notes/v4.6-2026-10-23/models-additions.yaml); caps are set by the sizing
+# probe, METHODOLOGY "Output-cap rules".
 # `released` is the public release date. Resolution is automated: if the model id
 # encodes a date (e.g. gpt-5.4-2026-03-05, claude-haiku-4-5-20251001) it is derived
 # by loader.released_from_id — leave `released` off. If the id has no date, set
@@ -106,7 +113,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-01, not the docs
     batch_discount: 0.5
-    price_verified: "2026-09-01"
+    price_verified: "2026-10-25"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-fable-5
     provider: anthropic
@@ -119,7 +126,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-5-5
     provider: anthropic
@@ -137,7 +144,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-22, not the docs
     batch_discount: 0.5
-    price_verified: "2026-09-22"
+    price_verified: "2026-10-25"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-5
     provider: anthropic
@@ -148,9 +155,12 @@ models:
     price_out: 25
     api: messages
     structured_outputs: true
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 6,423 tokens,
+                                 # 78% of 8,192 (above the 70% line); cap bounds thinking + answer
+                                 # sizing probe 2026-10-24 (its own 5 longest cases): peak 3,093 tokens, 9% of 32,768 -- the step-up clears
     batch_supported: true        # probed against the Batch API 2026-07-24, not the docs
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-4-8
     provider: anthropic
@@ -163,7 +173,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-4-7
     provider: anthropic
@@ -176,7 +186,35 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-opus-4-6
+    provider: anthropic
+    id: claude-opus-4-6
+    label: "Claude Opus 4.6"
+    released: "2026-02-05"       # anthropic.com/news/claude-opus-4-6 ("Feb 5, 2026"; Models API created_at 02-04)
+    price_in: 5                  # $5/$25 slot, same as Opus 4.5-4.8; batch $2.50/$12.50
+    price_out: 25
+    api: messages
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (claude-opus-4-8's 5 longest cases): peak 783 tokens = 9.6% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-opus-4-5
+    provider: anthropic
+    id: claude-opus-4-5-20251101
+    label: "Claude Opus 4.5"
+    released: "2025-11-24"       # anthropic.com/news/claude-opus-4-5; the id's 20251101 is the snapshot pin
+    price_in: 5                  # Active, retirement "not sooner than November 24, 2026"
+    price_out: 25
+    api: messages
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (claude-opus-4-8's 5 longest cases): peak 523 tokens = 6.4% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-sonnet-5-5
     provider: anthropic
@@ -184,7 +222,7 @@ models:
     label: "Claude Sonnet 5.5"      # spaced so `_lineage` reads version 5.5 and retires "Claude Sonnet 5"
     released: "2026-09-28"       # anthropic.com/claude-sonnet-5-5 and the model page both say
                                  # September 28, 2026; Models API created_at 2026-09-28 (same day).
-    price_in: 2                  # same $2/$10 slot as Sonnet 5; cache read $0.20 (standard 0.1x).
+    price_in: 2                  # same $2/$10 slot as Sonnet 5; cache read $0.10 (0.05x base input).
     price_out: 10                # Shipped defaults on the Claude API: adaptive thinking ON
                                  # (lowest setting `between_tools`), effort `high` (apps use medium).
                                  # Non-default temperature/top_p/top_k return 400.
@@ -192,7 +230,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-28, not the docs
     batch_discount: 0.5
-    price_verified: "2026-09-28"
+    price_verified: "2026-10-25"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-sonnet-5
     provider: anthropic
@@ -220,6 +258,8 @@ models:
     price_out: 10
     api: messages
     structured_outputs: true
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: one call in the last scored run hit the 8,192 cap
+                                 # (a v4.1 Conviction turn, waived); Models API max_tokens 128,000 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
     price_verified: "2026-08-24"
@@ -235,7 +275,21 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
+  - name: claude-sonnet-4-5
+    provider: anthropic
+    id: claude-sonnet-4-5-20250929
+    label: "Claude Sonnet 4.5"
+    # released auto-derived from id -> 2025-09-29 (the launch date)
+    price_in: 3                  # DEPRECATED 2026-09-30, RETIRES 2026-11-30 (replacement claude-sonnet-5-5)
+    price_out: 15
+    api: messages
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (claude-sonnet-4-6's 5 longest cases): peak 544 tokens = 6.6% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-haiku-5-5
     provider: anthropic
@@ -252,7 +306,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-10-07, not the docs
     batch_discount: 0.5
-    price_verified: "2026-10-07"
+    price_verified: "2026-10-25"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-haiku-4-5
     provider: anthropic
@@ -321,7 +375,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed 2026-09-04 against the Batch API itself, not read off the docs
     batch_discount: 0.5          # pricing page lists batch at $5 / $25 — exactly 50% off
-    price_verified: "2026-09-04"
+    price_verified: "2026-10-25"
     price_source: "https://developers.openai.com/api/docs/pricing"
   # GPT-6 Sol + Luna — announced 2026-09-22 (community.openai.com post dated
   # 09-22; openai.com/index/introducing-gpt-6-sol-and-luna returns 403 to fetch).
@@ -369,7 +423,7 @@ models:
     # Re-probed 2026-10-06 before the v4.3 run: BATCHABLE.
     batch_supported: true
     batch_discount: 0.5          # pricing page: batch $1 / $5
-    price_verified: "2026-09-29"
+    price_verified: "2026-10-25"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
@@ -384,7 +438,7 @@ models:
     structured_outputs: true
     batch_supported: true        # model page lists v1/batch; re-probed before the run
     batch_discount: 0.5          # pricing page: batch $0.05 / $0.25
-    price_verified: "2026-09-22"
+    price_verified: "2026-10-25"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.6-sol
     provider: openai
@@ -461,7 +515,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.4
     provider: openai
@@ -476,7 +530,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.4-mini
     provider: openai
@@ -491,14 +545,15 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.4-nano
     provider: openai
     id: gpt-5.4-nano
     label: "GPT-5.4 nano"
     superseded_by: gpt-5.6-luna  # David's ladder mapping, 2026-07-18
-    # bare alias id (undated); release date not separately verified -> shows as — on the board
+    released: "2026-03-17"       # the bare id is served by gpt-5.4-nano-2026-03-17 (checked 2026-10-23); the
+                                 # deprecations page lists that snapshot, and mini shipped the same day
     price_in: 0.2
     price_out: 1.25
     api: chat_completions
@@ -506,7 +561,169 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  # --- Older OpenAI models, registered 2026-10-24 for the v4.6 release-date progression run ---
+  # Shutdowns: o3 and the GPT-5 line 2026-12-11, GPT-4o / 4.1 line 2027-01-14, GPT-5.1 2027-04-01.
+  # GPT-4o, GPT-4o mini and o3 labels carry no parseable version, so each names its successor
+  # explicitly; every other line retires by label (src/leaderboard.py::_lineage).
+  - name: gpt-5.2
+    provider: openai
+    id: gpt-5.2-2025-12-11
+    label: "GPT-5.2"
+    price_in: 1.75               # no deprecation entry for the base model (only -chat-latest / -codex are dead)
+    price_out: 14
+    price_cached_in: 0.175
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-mini's 5 longest cases): peak 751 tokens = 9.2% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-5.1
+    provider: openai
+    id: gpt-5.1-2025-11-13
+    label: "GPT-5.1"
+    price_in: 1.25               # deprecated 2026-10-01, shuts down 2027-04-01
+    price_out: 10
+    price_cached_in: 0.125
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-mini's 5 longest cases): peak 763 tokens = 9.3% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-5
+    provider: openai
+    id: gpt-5-2025-08-07
+    label: "GPT-5"
+    price_in: 1.25               # shuts down 2026-12-11
+    price_out: 10
+    price_cached_in: 0.125
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.5's 5 longest cases): peak 5,501 tokens = 67.2% of 8,192
+    timeout_s: 600
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-5-mini
+    provider: openai
+    id: gpt-5-mini-2025-08-07
+    label: "GPT-5 mini"
+    price_in: 0.25               # shuts down 2026-12-11
+    price_out: 2
+    price_cached_in: 0.025
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-6-luna's 5 longest cases): peak 2,525 tokens = 30.8% of 8,192
+    timeout_s: 600
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-5-nano
+    provider: openai
+    id: gpt-5-nano-2025-08-07
+    label: "GPT-5 nano"
+    price_in: 0.05               # shuts down 2026-12-11
+    price_out: 0.4
+    price_cached_in: 0.005
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 32768            # sizing probe 2026-10-24 (gpt-6-luna's 5 longest cases): peak 5,850 tokens = 71.4% of 8,192 (over the 70% line); 18% of 32,768
+    timeout_s: 600
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: o3
+    provider: openai
+    id: o3-2025-04-16
+    label: "o3"
+    superseded_by: gpt-5         # label has no parseable version; OpenAI's own replacement is gpt-5.6-sol
+    price_in: 2                  # shuts down 2026-12-11. Hidden reasoning tokens bill as output.
+    price_out: 8
+    price_cached_in: 0.5
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.5's 5 longest cases): peak 1,526 tokens = 18.6% of 8,192
+    timeout_s: 600
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-4.1
+    provider: openai
+    id: gpt-4.1-2025-04-14
+    label: "GPT-4.1"
+    price_in: 2                  # shuts down 2027-01-14
+    price_out: 8
+    price_cached_in: 0.5
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-mini's 5 longest cases): peak 334 tokens = 4.1% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-4.1-mini
+    provider: openai
+    id: gpt-4.1-mini-2025-04-14
+    label: "GPT-4.1 mini"
+    price_in: 0.4                # shuts down 2027-01-14
+    price_out: 1.6
+    price_cached_in: 0.1
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-nano's 5 longest cases): peak 453 tokens = 5.5% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-4o
+    provider: openai
+    id: gpt-4o-2024-11-20
+    label: "GPT-4o"
+    superseded_by: gpt-4.1       # label has no parseable version; see the LABELS note
+    # released auto-derived from id -> 2024-11-20 (snapshot date; family launch was 2024-05-13)
+    price_in: 2.5                # deprecated 2026-10-14, shuts down 2027-01-14. The 2024-05-13 snapshot died today.
+    price_out: 10
+    price_cached_in: 1.25
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-mini's 5 longest cases): peak 261 tokens = 3.2% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-4o-mini
+    provider: openai
+    id: gpt-4o-mini-2024-07-18
+    label: "GPT-4o mini"
+    superseded_by: gpt-4.1-mini
+    price_in: 0.15               # shuts down 2027-01-14
+    price_out: 0.6
+    price_cached_in: 0.075
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-nano's 5 longest cases): peak 284 tokens = 3.5% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
     price_source: "https://developers.openai.com/api/docs/pricing"
 
   # --- Google ---
@@ -521,6 +738,8 @@ models:
     price_out: 12
     api: generate_content
     structured_outputs: true
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: two calls in the last scored run hit the 8,192 cap
+                                 # (waived); models.get outputTokenLimit 65,536 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
     price_verified: "2026-08-24"
@@ -542,7 +761,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-10-13"
+    price_verified: "2026-10-25"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2026-12-01"
@@ -589,9 +808,11 @@ models:
     price_out: 3.75
     api: generate_content
     structured_outputs: true
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: two calls in the last scored run hit the 8,192 cap
+                                 # (waived); models.get outputTokenLimit 65,536 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-10-13"
+    price_verified: "2026-10-25"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
@@ -639,7 +860,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
@@ -671,33 +892,53 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-25"
+    price_source: "https://ai.google.dev/gemini-api/docs/pricing"
+  - name: gemini-3-flash
+    provider: google
+    id: gemini-3-flash-preview
+    label: "Gemini 3 Flash"
+    availability: preview        # ai.google.dev/gemini-api/docs/models: "Preview" (2026-10-23); frozen at collection
+    released: "2025-12-17"       # Google deprecations page; replacement listed as gemini-3.6-flash but
+                                 # NOT stated as routed (unlike 3.5/3.7 Flash). Confirm it answers as itself.
+    price_in: 0.5
+    price_out: 3
+    api: generate_content
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gemini-3.6-flash's 5 longest cases): peak 1,594 tokens = 19.5% of 8,192
+    batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
+    batch_discount: 0.5
+    price_verified: "2026-10-24"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
   - name: gemini-3.1-flash-lite
     provider: google
     id: gemini-3.1-flash-lite
     label: "Gemini 3.1 Flash-Lite"
-    # bare id (undated); release date not separately verified -> shows as — on the board
+    released: "2026-05-07"       # ai.google.dev/gemini-api/docs/deprecations "Release date" (GA; the preview was 2026-03-03)
     price_in: 0.25
     price_out: 1.5
     api: generate_content
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
   - name: gemini-2.5-flash
     provider: google
     id: gemini-2.5-flash
     label: "Gemini 2.5 Flash"
     released: "2025-06-17"       # cloud.google.com Gemini 2.5 Flash GA
+    api_retired: "2026-09-18"    # access cutoff: from this date Google limits the 2.5 models "to users who have
+                                 # actively used them in the past". Probed 2026-10-23: batch AND live both 404
+                                 # "no longer available to new users" on this key. Not callable; not in the v4.6 run.
+                                 # (gemini-2.5-pro and -flash-lite 404 the same way and were never registered.)
     price_in: 0.3
     price_out: 2.5
     api: generate_content
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
 
   # --- xAI (OpenAI-compatible endpoint; https://api.x.ai/v1) ---
@@ -724,6 +965,13 @@ models:
   # default `high` (docs: "grok-4.7, grok-4.6, and grok-4.5 support the reasoning_effort
   # parameter... defaults to high. Reasoning cannot be disabled"), so 4.7-vs-4.6 is the
   # second clean model-only A/B in this line. Batch: rejected outright, same as 4.6.
+  # UPDATE 2026-10-24 -- THE BATCH REJECTION BELOW HAS LIFTED. The xAI Batch API now ACCEPTS
+  # grok-4.7, 4.6, 4.5, 4.3 and 4.20 into a live batch (notes/v4.6-2026-10-23/batch_probe_older.py,
+  # re-checked by hand with a bogus model id as the negative control: rejected on the same call),
+  # and the docs' "20% off standard rates" line is back. They still run LIVE: src/batch.py has no
+  # xAI adapter, and the saving is ~20% of ~$10 of xAI spend, so every Grok entry carries
+  # `batch_declined: true` (the grok-4.3 precedent). The 2026-08-12 / 2026-09-21 rejections
+  # described below are history -- the same shape as GPT-5.6, in the other direction.
   # BATCH IS NOW IMPOSSIBLE FOR 4.6 AND 4.5, and the reason CHANGED on 2026-08-12.
   # It used to be economic (batch accepted grok-4.5 at a 0% discount, so live was
   # simpler). It is now a hard rejection: the docs warn "`grok-4.6` and `grok-4.5`
@@ -755,11 +1003,11 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true
-    batch_supported: false       # HARD rejection, probed 2026-09-21 with notes/batch_probe.py:
+    batch_supported: false       # ELIGIBLE BUT DECLINED since 2026-10-24 (no xAI adapter in src/batch.py). History:
+    batch_declined: true         # HARD rejection, probed 2026-09-21 with notes/batch_probe.py:
                                  # "Model grok-4.7 is not supported for batch processing" (4.6 same,
-                                 # 4.3 control ACCEPTED). The pricing page's "20% off standard rates"
-                                 # line for 4.7 is wrong against the live API — the API wins.
-    price_verified: "2026-09-21"
+                                 # 4.3 control ACCEPTED). Re-probed 2026-10-24: ACCEPTED, as the docs' "20% off".
+    price_verified: "2026-10-25"
     price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.6
     provider: xai
@@ -783,8 +1031,9 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true
-    batch_supported: false       # HARD rejection, not an economic call — see the block above
-    price_verified: "2026-08-24"
+    batch_supported: false       # ELIGIBLE BUT DECLINED since 2026-10-24: the Batch API accepts it again (was a HARD
+    batch_declined: true         # rejection through 2026-09-21, see the block above); no xAI adapter -> live
+    price_verified: "2026-10-24"
     price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.5
     provider: xai
@@ -801,9 +1050,9 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true
-    batch_supported: false       # was "batch works, 0% discount"; as of 2026-08-12 the Batch API
-                                 # REJECTS grok-4.5 outright, same as 4.6. Still live, harder reason.
-    price_verified: "2026-08-24"
+    batch_supported: false       # was "batch works, 0% discount"; 2026-08-12 the Batch API REJECTED grok-4.5
+    batch_declined: true         # outright, same as 4.6. ACCEPTED again 2026-10-24; no xAI adapter -> live.
+    price_verified: "2026-10-24"
     price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.3
     provider: xai
@@ -813,6 +1062,9 @@ models:
     # `released` intentionally omitted: xAI published no announcement post and no
     # release-notes entry for 4.3, and the API `created` field is documented as
     # "model creation time", not a release date. Shows as — on the board.
+    # Re-checked 2026-10-24: docs.x.ai release notes (March-July) and the model page still carry no
+    # date, x.ai/news is Cloudflare-blocked to fetches. Third-party sources say API ~2026-04-30,
+    # wide 2026-05-05/06: unverified, so it stays undated (the progression chart lists it as undated).
     price_in: 1.25
     price_out: 2.5
     price_cached_in: 0.2         # xAI caches automatically; prompt_tokens INCLUDES cached
@@ -827,7 +1079,45 @@ models:
                                  # apart from "we said no", instead of reporting a standing
                                  # DISAGREES on every run — an alarm that always fires is an
                                  # alarm nobody reads, and it would mask a genuine flip.
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
+    price_source: "https://docs.x.ai/developers/pricing"
+  - name: grok-4.20-reasoning
+    provider: xai
+    id: grok-4.20-0309-reasoning
+    base_url: https://api.x.ai/v1
+    label: "Grok 4.20 reasoning"  # NOT "Grok 4.20": see the LABELS note (4.20 > 4.7 in version order)
+    superseded_by: grok-4.3
+    released: "2026-03-10"       # docs.x.ai release notes: "Grok 4.20 ... live" under March (no day); API created
+                                 # 2026-03-09 is a checkpoint date. Month is first-party, day is not.
+    price_in: 1.25               # <200k prompt tokens; >=200k is $2.50/$5, never hit on this bank
+    price_out: 2.5
+    price_cached_in: 0.2
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (grok-4.3's 5 longest cases): peak 4,165 tokens incl. reasoning; xAI's cap bounds visible output only and no call hit it
+    batch_supported: false       # ELIGIBLE BUT DECLINED (grok-4.3 precedent): the xAI Batch API ACCEPTED it on
+    batch_declined: true         # 2026-10-23 (notes/v4.6-2026-10-23/batch_probe_older.py; docs say 20% off), but
+                                 # src/batch.py has no xAI adapter, so it runs live
+    price_verified: "2026-10-24"
+    price_source: "https://docs.x.ai/developers/pricing"
+  - name: grok-4.20-non-reasoning
+    provider: xai
+    id: grok-4.20-0309-non-reasoning
+    base_url: https://api.x.ai/v1
+    label: "Grok 4.20 non-reasoning"
+    superseded_by: grok-4.3
+    released: "2026-03-10"       # same release as the reasoning sibling
+    price_in: 1.25
+    price_out: 2.5
+    price_cached_in: 0.2
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.4-mini's 5 longest cases): peak 452 tokens; xAI's cap bounds visible output only and no call hit it
+    batch_supported: false       # accepted by the xAI Batch API 2026-10-23; no adapter in src/batch.py -> live
+    batch_declined: true
+    price_verified: "2026-10-24"
     price_source: "https://docs.x.ai/developers/pricing"
 
   # --- Meta (OpenAI-compatible endpoint; https://api.meta.ai/v1) ---
@@ -887,8 +1177,11 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 5,914 tokens,
+                                 # 72% of 8,192 (above the 70% line); cap bounds reasoning + answer
+                                 # sizing probe 2026-10-24 (its own 5 longest cases): peak 7,888 tokens, 24% of 32,768 -- the step-up clears
     batch_supported: false       # no batch API exists at all -> run live
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
                                   # and 1.2 — "Both checkpoints share the same standard
                                   # pricing". THE "EYE-ONLY, FOREVER" NOTE THAT SAT HERE IS
                                   # RETIRED: on 2026-08-13 dev.meta.ai fetched normally and
@@ -963,7 +1256,7 @@ models:
     migration_target: responses
     structured_outputs: true     # response_format json_schema; decoding is constrained
     batch_supported: false       # /v1/batches exists but every endpoint is "not enabled"
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-24"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # Muse Spark 1.3 — announced 2026-09-02 (research.meta.ai/blog/introducing-muse-spark-1-3),
@@ -1008,8 +1301,11 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true     # response_format json_schema strict, verified 2026-09-02
+    max_tokens: 32768            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 7,960 tokens,
+                                 # 97% of 8,192 (11 calls above 70%); cap bounds reasoning + answer. The API
+                                 # accepted 32,768 on 2026-10-24 (Muse Spark 1.1 and Muse Wonder 1.0 run at it)
     batch_supported: false       # re-probed 2026-09-02, see notes/session-log.md; 2026-10-07: "batch API not enabled"
-    price_verified: "2026-09-02"
+    price_verified: "2026-10-25"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # Muse Wonder 1.0 — announced and added 2026-10-12 (about.fb.com/news/2026/10/
@@ -1049,7 +1345,7 @@ models:
     # answered bank items used 3,442-9,568 output tokens, so 8,192 would truncate.
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 9,568
     timeout_s: 900
-    price_verified: "2026-10-12"
+    price_verified: "2026-10-25"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # --- Moonshot AI (OpenAI-compatible endpoint; https://api.moonshot.ai/v1) ---
@@ -1145,10 +1441,13 @@ models:
     api: chat_completions
     structured_outputs: true     # json_schema strict per the K3.1 Pro quickstart
     stream: true
-    max_tokens: 32768
+    max_tokens: 65536            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 26,656 tokens,
+                                 # 81% of 32,768 (6 calls above 70%; 2 generations hit the cap and were re-run
+                                 # once, rule 3). Moonshot documents a 1,048,576 maximum; the API accepted
+                                 # 65,536 on 2026-10-24
     timeout_s: 600
     batch_supported: false       # Batch docs list kimi-k2.7-code + kimi-k2.6 only (2026-10-23)
-    price_verified: "2026-10-23"
+    price_verified: "2026-10-25"
     price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
 
   # --- Qwen (Alibaba) — 7th lab, added 2026-08-03 (launch day) ---
@@ -1228,7 +1527,9 @@ models:
     api: chat_completions
     structured_outputs: true     # json_schema strict probed OK
     stream: true                 # vendor's own sample streams; long xhigh thinks
-    max_tokens: 32768            # cap bounds reasoning+answer together; see header
+    max_tokens: 65536            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 28,220 tokens,
+                                 # 86% of 32,768 (3 calls above 70%); cap bounds reasoning+answer together (see
+                                 # header); 65,536 is the vendor's documented output ceiling; API accepted it 2026-10-24
     timeout_s: 900
     batch_supported: false       # Batch API rejects the id; control passed twice; re-probed 2026-10-07: still
                                  # "not supported by the Batch API", control qwen-plus accepted
@@ -1253,7 +1554,7 @@ models:
     # docs will not substitute for. Cost-estimate only; never reaches the board.
     # (Confirmed unchanged: cached_tokens sits INSIDE prompt_tokens -- "This value
     # is part of usage.prompt_tokens" -- so declaring price_cached_in stays safe.)
-    price_verified: "2026-08-24"   # price_in/price_out only; cached still open
+    price_verified: "2026-10-25"   # price_in/price_out only; cached still open
     price_source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
 
   # --- DeepSeek — 8th lab, added 2026-08-13 ---
@@ -1341,7 +1642,7 @@ models:
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
     timeout_s: 900
     batch_supported: false       # DeepSeek has no batch API at all (2026-10-07: /batches and /v1/batches 404)
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-25"
     price_source: "https://api-docs.deepseek.com/quick_start/pricing"
     # PEAK/OFF-PEAK BILLING LANDED 2026-08-16, re-verified first-party 2026-08-19.
     # The pricing page now presents the split as CURRENT, with no transition
@@ -1485,11 +1786,13 @@ models:
     api: chat_completions
     structured_outputs: false    # json_object only — no json_schema on any GLM
     stream: true                 # per-chunk timeout catches hangs; see header
-    max_tokens: 32768            # cap bounds reasoning+answer; worst measured 4,496
+    max_tokens: 65536            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 29,425 tokens,
+                                 # 90% of 32,768; cap bounds reasoning+answer. docs.z.ai/guides/llm/glm-5.3: "maximum
+                                 # output length of 128K tokens"; the API accepted 65,536 on 2026-10-24
     timeout_s: 240               # per chunk when streaming; a hang cost 45 min at 900 non-streamed
     batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed; re-probed
                                  # 2026-10-07: glm-5.3 still off the list (1210); glm-5.1 now needs ID verification (1000)
-    price_verified: "2026-08-24"
+    price_verified: "2026-10-25"
     price_source: "https://docs.z.ai/guides/overview/pricing"
 
   # --- MiniMax — 10th lab, added 2026-09-22 (MiniMax-M3, released 2026-06-01) ---
@@ -1570,7 +1873,7 @@ models:
     max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
     timeout_s: 900
     batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
-    price_verified: "2026-09-22"
+    price_verified: "2026-10-25"
     price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
 
   # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
@@ -1631,8 +1934,11 @@ models:
     # thinking chunk first, and 5 of 22 new-case batch answers spent the whole 8,192 cap
     # thinking with no answer (finish_reason length). Its v4.2 answers used no reasoning, so
     # the cap never bound them.
-    max_tokens: 32768
-    price_verified: "2026-10-06"
+    # Rule 6 step-up 2026-10-24: its longest call in the last scored run was 25,203 tokens, 77% of
+    # 32,768. docs.mistral.ai/models/mistral-large-4-0 lists a 1M context and no lower output
+    # maximum; the API accepted 65,536 on 2026-10-24.
+    max_tokens: 65536
+    price_verified: "2026-10-25"
     price_source: "https://mistral.ai/news/mistral-large-4"
 
   # Beam (Reflection AI) — 12th lab, added 2026-10-12 (David: "add it to the eval").

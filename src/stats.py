@@ -26,11 +26,13 @@ MDE_POWER = 0.80
 CREDIT_DENOMINATOR_LIMIT = 64
 
 # Memory guard for the exact sign-flip distribution: one float64 per lattice
-# point, so 50M points is 400 MB (about twice that at peak, with the working copy).
+# point, so 64M points is 512 MB (about twice that at peak, with the working copy).
 # The v3.6 board's widest pair is 1.1M; on v4.3 (93 items, finer check weights)
-# the widest is 28.1M and takes about 5 s. Raised from 10M on 2026-10-07; the
-# p-value computed is unchanged, the guard only refuses to compute it.
-MAX_LATTICE_WIDTH = 50_000_000
+# the widest is 28.1M and takes about 5 s. On v4.6, panel landmine credits in
+# halves and thirds widen it: the widest of 1,830 pairs is 56.8M. Raised from
+# 10M on 2026-10-07 and from 50M on 2026-10-25; the p-value computed is
+# unchanged, the guard only refuses to compute it.
+MAX_LATTICE_WIDTH = 64_000_000
 
 # Test inversion runs the sign-flip test at shifted nulls. A shifted item
 # contribution is no longer on the exact rational lattice, so it is rounded
@@ -216,11 +218,17 @@ def _lattice_p(coefficients) -> float:
             f"{MAX_LATTICE_WIDTH:,}-point memory guard")
     probs = np.zeros(total + 1)
     probs[0] = 1.0
+
+    # One reusable buffer for the shifted copy: allocating a fresh array of up
+    # to `total` points at every step made wide lattices 15-20x slower. Halving
+    # first and copying the halved values is the same arithmetic (x 0.5 is
+    # exact), so the result is bit-identical.
+    moved = np.empty(total + 1)
     end = 1
     for weight in weights:
-        moved = probs[:end].copy()
         probs[:end] *= 0.5
-        probs[weight:end + weight] += 0.5 * moved
+        moved[:end] = probs[:end]
+        probs[weight:end + weight] += moved[:end]
         end += weight
     tail = float(probs[:(total - observed) // 2 + 1].sum())
     return min(1.0, 2 * tail)

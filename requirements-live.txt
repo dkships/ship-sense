@@ -1,4 +1,4 @@
-# Provider SDKs — only needed for a LIVE cross-lab run (make live / make refresh),
+# Provider SDKs — only needed for a LIVE cross-lab run (make live and the batch driver),
 # not for tests or `make sample`. Imported lazily in src/providers.py, so the suite
 # runs without them installed. Install with: pip install -r requirements-live.txt
 # xAI/Grok needs no SDK of its own: it is OpenAI-compatible and rides the `openai`

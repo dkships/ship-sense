@@ -137,15 +137,13 @@ def test_sample_audit_matches_committed_golden():
         "docs/sample-audit.csv`")
 
 
-def test_report_builds_scorecard_and_chart():
+def test_report_builds_scorecard():
     per_model = run.run(["mock-strong", "mock-weak"], run_id="pytest",
                         only_examples=True)
     card = report.write_scorecard("pytest", per_model)
-    png = report.plot_leaderboard("pytest", per_model)
     text = card.read_text()
     assert "Ship Sense Score" in text and "/ 100" in text
     assert "Limitations" in text and "Single-author keys" in text
-    assert png.exists() and png.stat().st_size > 0
 
 
 def test_live_trace_records_max_tokens_sent():

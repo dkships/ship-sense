@@ -45,6 +45,24 @@ def test_contracted_negation_is_not_a_false_alarm():
         assert _fa({"conclusions": [text]})["loyalty"] is True, text
 
 
+def test_nothing_and_neither_nor_negate():
+    # "nothing ..." and "neither ... nor ..." rebut the claim like "no" / "not",
+    # within the same short look-back.
+    for text in ("nothing here shows strong retention",
+                 "neither the test nor the dashboard shows strong retention",
+                 "neither strong retention nor loyalty is shown"):
+        assert _fa({"conclusions": [text]})["loyalty"] is True, text
+
+
+def test_assertion_past_nothing_or_neither_still_fires():
+    # The new negators reach only the look-back window, so a later assertion in
+    # the same statement is still a false alarm.
+    for text in ("the dashboard shows strong retention",
+                 "nothing broke in the export, and the cohort table shows strong retention",
+                 "neither drop was real, so overall the data shows strong retention"):
+        assert _fa({"conclusions": [text]})["loyalty"] is False, text
+
+
 def test_asserted_conclusion_is_a_false_alarm():
     assertion = {"limitations": [], "conclusions": ["these are loyal customers"]}
     assert _fa(assertion)["loyalty"] is False  # asserting it = penalised

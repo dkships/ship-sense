@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 import itertools
 import json
 from pathlib import Path
@@ -42,6 +43,7 @@ HYPOTHESES = ROOT / "hypotheses.yaml"
 
 FAMILY_CONFIRMATORY = "confirmatory"
 FAMILY_EXPLORATORY = "exploratory"
+FAMILY_EXPLORATORY_ONLY = "exploratory_only"  # models no succession may make confirmatory
 RULE_ALL_SUCCESSIONS = "all"
 RULE_ALL_PAIRS = "all_pairs"
 REASON_SUCCESSION = "succession"
@@ -120,7 +122,8 @@ def load_families(version: str, path: Path = HYPOTHESES) -> dict:
         raise ValueError(f"{version}: exploratory must be {RULE_ALL_PAIRS!r}")
     return {"version": version, "registered": block.get("registered"),
             "note": block.get("note"), "successions": successions,
-            "claims": claims, "exploratory": exploratory}
+            "claims": claims, "exploratory": exploratory,
+            "exploratory_only": list(block.get(FAMILY_EXPLORATORY_ONLY) or [])}
 
 
 def _is_succession_list(value) -> bool:
@@ -152,7 +155,10 @@ def confirmatory_pairs(names: list[str], scores: dict[str, tuple],
     registered = None if rule == RULE_ALL_SUCCESSIONS else {
         frozenset((s["prev"], s["curr"])) for s in rule}
     succ = leaderboard.successions(_board_rows(names, scores))
+    exploratory_only = set(family.get(FAMILY_EXPLORATORY_ONLY) or ())
     for prev, curr in succ.items():
+        if prev in exploratory_only or curr in exploratory_only:
+            continue  # registered as exploratory: stays in the BH family
         key = frozenset((prev, curr))
         group = (GROUP_REGISTERED if registered is None or key in registered
                  else f"{GROUP_ADDED}:{prev}->{curr}")
@@ -186,7 +192,8 @@ def compare(per_model: dict[str, list[dict]], models: list[str],
             n: int = 10000, seed: int = 0,
             permutations: int | None = None,
             confirmatory: dict[frozenset, dict] | None = None,
-            invert: set[frozenset] | None = None) -> list[dict]:
+            invert: set[frozenset] | None = None,
+            workers: int = 1) -> list[dict]:
     """Every unordered pair, higher-ranked model first. `models` is rank-ordered.
 
     Only one direction is computed: reversing a pair negates the difference and
@@ -206,25 +213,54 @@ def compare(per_model: dict[str, list[dict]], models: list[str],
                        for r in per_model[name]) for name in models]
     if rosters and any(roster != rosters[0] for roster in rosters[1:]):
         raise ValueError("pairwise inference requires identical checks, weights, and generation coverage")
-    for a, b in itertools.combinations(models, 2):
-        key = frozenset((a, b))
-        res = stats.paired_bootstrap(per_model[a], per_model[b], n=n, seed=seed)
-        p_value = stats.paired_exact_p(per_model[a], per_model[b])
-        lo, hi = res["ci"]
-        ci_source = CI_BOOTSTRAP
-        if invert is None or key in invert:
-            lo, hi = stats.paired_signflip_ci(per_model[a], per_model[b])
-            ci_source = CI_INVERTED
-        se = res.get("se", 0.0)
-        hypothesis = confirmatory.get(key)
-        out.append({"a": a, "b": b, "diff": res["diff"], "lo": lo, "hi": hi,
-                    "ci_source": ci_source, "se": se, "mde": stats.mde(se),
-                    "n_items": res["n_items"], "p_value": p_value,
-                    "test": TEST_NAME,
+
+    # Each pair is independent and seeded the same way, so worker processes
+    # return exactly what one process would, in the same order.
+    pairs = list(itertools.combinations(models, 2))
+    settings = {"per_model": per_model, "n": n, "seed": seed, "invert": invert}
+    if workers > 1:
+        with ProcessPoolExecutor(workers, initializer=_init_worker,
+                                 initargs=(settings,)) as pool:
+            rows = list(pool.map(_worker_pair, pairs))
+    else:
+        rows = [_pair_stats(a, b, **settings) for a, b in pairs]
+
+    for row in rows:
+        hypothesis = confirmatory.get(frozenset((row["a"], row["b"])))
+        out.append({**row,
                     "family": FAMILY_CONFIRMATORY if hypothesis else FAMILY_EXPLORATORY,
                     "hypothesis": hypothesis})
     _adjust_families(out)
     return out
+
+
+# Worker-process state for compare(workers > 1): set once per process, so a
+# pair task carries only two model names.
+_WORKER_SETTINGS: dict = {}
+
+
+def _init_worker(settings: dict) -> None:
+    _WORKER_SETTINGS.update(settings)
+
+
+def _worker_pair(pair: tuple[str, str]) -> dict:
+    return _pair_stats(*pair, **_WORKER_SETTINGS)
+
+
+def _pair_stats(a: str, b: str, per_model: dict[str, list[dict]], n: int, seed: int,
+                invert: set[frozenset] | None) -> dict:
+    """One pair's difference, interval and exact p-value; families come later."""
+    res = stats.paired_bootstrap(per_model[a], per_model[b], n=n, seed=seed)
+    p_value = stats.paired_exact_p(per_model[a], per_model[b])
+    lo, hi = res["ci"]
+    ci_source = CI_BOOTSTRAP
+    if invert is None or frozenset((a, b)) in invert:
+        lo, hi = stats.paired_signflip_ci(per_model[a], per_model[b])
+        ci_source = CI_INVERTED
+    se = res.get("se", 0.0)
+    return {"a": a, "b": b, "diff": res["diff"], "lo": lo, "hi": hi,
+            "ci_source": ci_source, "se": se, "mde": stats.mde(se),
+            "n_items": res["n_items"], "p_value": p_value, "test": TEST_NAME}
 
 
 def _adjust_families(records: list[dict]) -> None:
@@ -433,6 +469,8 @@ def main():
     ap.add_argument("--permutations", type=int, default=None,
                     help="Deprecated compatibility option; p-values are now exact.")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--workers", type=int, default=1,
+                    help="Worker processes for the pair statistics; results are identical.")
     args = ap.parse_args()
 
     run_ids = [args.run_id, *args.merge_run_id]
@@ -444,7 +482,8 @@ def main():
     order, scores = rank(per_model)
     confirm, untested = confirmatory_pairs(order, scores, family)
     records = compare(per_model, order, n=args.n, seed=args.seed,
-                      permutations=args.permutations, confirmatory=confirm)
+                      permutations=args.permutations, confirmatory=confirm,
+                      workers=args.workers)
     lineup = current_lineup(order, scores)
     rank_sets = stats.rank_sets(lineup, records)
     first = stats.p_first({m: per_model[m] for m in lineup}, lineup,
