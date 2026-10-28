@@ -425,6 +425,32 @@ models:
     batch_discount: 0.5          # pricing page: batch $1 / $5
     price_verified: "2026-10-25"
     price_source: "https://developers.openai.com/api/docs/pricing"
+  # GPT-6.1 Terra — announced 2026-10-26 (developers.openai.com/api/docs/changelog,
+  # "a fast, efficient model for visual reasoning, precise computer use, and clear,
+  # natural writing"; names no comparison model, so no claim to register). Listed
+  # on /v1/models the same day; `created` 1791908780 = 2026-10-13 is a checkpoint
+  # stamp, not the release. Model page: default reasoning.effort medium (none..max),
+  # 1.05M context, 128k max output, structured outputs, Batch. Pricing page: $1 /
+  # $5, cached $0.05, batch $0.50 / $2.50 (inputs over 272k tokens bill $2 / $7.50;
+  # no case comes near). It restores the mid tier OpenAI dropped at GPT-6, so the
+  # lineup is Astra / Sol / Terra / Luna again. Same-line successor of GPT-5.6
+  # Terra: `_lineage` pairs them ("gpt terra" 6.1 > 5.6), tested as its own family
+  # of one. Registered 2026-10-26 before any Terra answer.
+  - name: gpt-6.1-terra
+    provider: openai
+    id: gpt-6.1-terra
+    label: "GPT-6.1 Terra"
+    released: "2026-10-26"
+    price_in: 1
+    price_out: 5
+    price_cached_in: 0.05
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true
+    batch_supported: true        # model page lists v1/batch; probed before the run
+    batch_discount: 0.5          # pricing page: batch $0.50 / $2.50
+    price_verified: "2026-10-26"
+    price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
     id: gpt-6-luna
@@ -487,7 +513,10 @@ models:
     # dropped tier, not a retired model. OpenAI names no successor; GPT-6 Sol took
     # Terra's price point ($2 in). David's call 2026-10-12: off the current board.
     # A replacement, not a succession: no generation pair, no confirmatory test.
-    replaced_by: gpt-6.1-sol
+    # 2026-10-26: OpenAI shipped GPT-6.1 Terra, the named same-line successor, so
+    # `replaced_by: gpt-6.1-sol` is removed and `_lineage` pairs 5.6 Terra with
+    # 6.1 Terra (family of one). The v4.4-v4.6 history pages keep the replacement
+    # as published.
   - name: gpt-5.6-luna
     provider: openai
     id: gpt-5.6-luna
