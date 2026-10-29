@@ -9,6 +9,9 @@
 # that scored it; leaderboard.json keeps the at-test price frozen (see
 # leaderboard._repriced), so editing a price here changes the board but never
 # rewrites a published snapshot;
+# 2026-10-29: sweep of the 21 current entries against first-party pages
+# (notes/ml4-1029-2026-10-29/price-check-2026-10-29.md): 0 mismatches besides
+# Mistral Large 4's new checkpoint ($0.70/$2.10, its own entry); price_verified bumped.
 # 2026-08-24: FULL sweep of all 30 priced entries against each provider's own
 # first-party page. ONE moved: gpt-5.6-sol $5/$30 -> $4/$20 (-20% in/-33% out).
 # Unlike the 2026-07-30 Terra/Luna cuts, Sol's cut is PROMOTIONAL — OpenAI
@@ -72,6 +75,15 @@ defaults:
 # advertised as open-weight, weights not yet downloadable: grouped with open-weight
 # models, tagged "weights due" (David's call 2026-10-12). Absent = closed.
 # `weights_license` is the short licence note shown beside an open-weight model.
+# CHECKPOINT SWAPS (David, 2026-10-29): when a vendor serves a new checkpoint under an
+# id already on the board, the new checkpoint gets its own entry (same `id`, new
+# `name`, `released` = swap date), answers fresh, and the old entry declares
+# `superseded_by` (generation pair, own family of one). Measured fields on the old
+# entry (availability, at-test price in the ledger) stay frozen; `weights` follows the
+# exact checkpoint, so the old entry is closed if only the later one's weights ship.
+# Detect swaps from vendor release notes; `created` on /models is only a prompt
+# (Mistral returns the request time; Moonshot bulk re-stamps; Meta/DeepSeek/Google
+# give none). First case: mistral-large-4 -> mistral-large-4-1029.
 # Display-only, like availability. Verified 2026-10-12 against the Hugging Face API.
 # `availability` (optional): the VENDOR'S OWN pre-release label on this model
 # ("preview" or "beta") WHEN ITS BOARD ANSWERS WERE COLLECTED. Absent = no label then
@@ -113,7 +125,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-01, not the docs
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-fable-5
     provider: anthropic
@@ -144,7 +156,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-22, not the docs
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-5
     provider: anthropic
@@ -230,7 +242,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-28, not the docs
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-sonnet-5
     provider: anthropic
@@ -306,7 +318,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-10-07, not the docs
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-haiku-4-5
     provider: anthropic
@@ -375,7 +387,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed 2026-09-04 against the Batch API itself, not read off the docs
     batch_discount: 0.5          # pricing page lists batch at $5 / $25 — exactly 50% off
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://developers.openai.com/api/docs/pricing"
   # GPT-6 Sol + Luna — announced 2026-09-22 (community.openai.com post dated
   # 09-22; openai.com/index/introducing-gpt-6-sol-and-luna returns 403 to fetch).
@@ -423,7 +435,7 @@ models:
     # Re-probed 2026-10-06 before the v4.3 run: BATCHABLE.
     batch_supported: true
     batch_discount: 0.5          # pricing page: batch $1 / $5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://developers.openai.com/api/docs/pricing"
   # GPT-6.1 Terra — announced 2026-10-26 (developers.openai.com/api/docs/changelog,
   # "a fast, efficient model for visual reasoning, precise computer use, and clear,
@@ -449,7 +461,7 @@ models:
     structured_outputs: true
     batch_supported: true        # model page lists v1/batch; probed before the run
     batch_discount: 0.5          # pricing page: batch $0.50 / $2.50
-    price_verified: "2026-10-26"
+    price_verified: "2026-10-29"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
@@ -464,7 +476,7 @@ models:
     structured_outputs: true
     batch_supported: true        # model page lists v1/batch; re-probed before the run
     batch_discount: 0.5          # pricing page: batch $0.05 / $0.25
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.6-sol
     provider: openai
@@ -790,7 +802,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2026-12-01"
@@ -841,7 +853,7 @@ models:
                                  # (waived); models.get outputTokenLimit 65,536 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
@@ -921,7 +933,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
   - name: gemini-3-flash
     provider: google
@@ -1036,7 +1048,7 @@ models:
     batch_declined: true         # HARD rejection, probed 2026-09-21 with notes/batch_probe.py:
                                  # "Model grok-4.7 is not supported for batch processing" (4.6 same,
                                  # 4.3 control ACCEPTED). Re-probed 2026-10-24: ACCEPTED, as the docs' "20% off".
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.6
     provider: xai
@@ -1334,7 +1346,7 @@ models:
                                  # 97% of 8,192 (11 calls above 70%); cap bounds reasoning + answer. The API
                                  # accepted 32,768 on 2026-10-24 (Muse Spark 1.1 and Muse Wonder 1.0 run at it)
     batch_supported: false       # re-probed 2026-09-02, see notes/session-log.md; 2026-10-07: "batch API not enabled"
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # Muse Wonder 1.0 — announced and added 2026-10-12 (about.fb.com/news/2026/10/
@@ -1374,7 +1386,7 @@ models:
     # answered bank items used 3,442-9,568 output tokens, so 8,192 would truncate.
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 9,568
     timeout_s: 900
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # --- Moonshot AI (OpenAI-compatible endpoint; https://api.moonshot.ai/v1) ---
@@ -1476,7 +1488,7 @@ models:
                                  # 65,536 on 2026-10-24
     timeout_s: 600
     batch_supported: false       # Batch docs list kimi-k2.7-code + kimi-k2.6 only (2026-10-23)
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
 
   # --- Qwen (Alibaba) — 7th lab, added 2026-08-03 (launch day) ---
@@ -1583,7 +1595,7 @@ models:
     # docs will not substitute for. Cost-estimate only; never reaches the board.
     # (Confirmed unchanged: cached_tokens sits INSIDE prompt_tokens -- "This value
     # is part of usage.prompt_tokens" -- so declaring price_cached_in stays safe.)
-    price_verified: "2026-10-25"   # price_in/price_out only; cached still open
+    price_verified: "2026-10-29"   # price_in/price_out only; cached still open
     price_source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
 
   # --- DeepSeek — 8th lab, added 2026-08-13 ---
@@ -1671,7 +1683,7 @@ models:
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
     timeout_s: 900
     batch_supported: false       # DeepSeek has no batch API at all (2026-10-07: /batches and /v1/batches 404)
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://api-docs.deepseek.com/quick_start/pricing"
     # PEAK/OFF-PEAK BILLING LANDED 2026-08-16, re-verified first-party 2026-08-19.
     # The pricing page now presents the split as CURRENT, with no transition
@@ -1821,7 +1833,7 @@ models:
     timeout_s: 240               # per chunk when streaming; a hang cost 45 min at 900 non-streamed
     batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed; re-probed
                                  # 2026-10-07: glm-5.3 still off the list (1210); glm-5.1 now needs ID verification (1000)
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://docs.z.ai/guides/overview/pricing"
 
   # --- MiniMax — 10th lab, added 2026-09-22 (MiniMax-M3, released 2026-06-01) ---
@@ -1902,7 +1914,7 @@ models:
     max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
     timeout_s: 900
     batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
-    price_verified: "2026-10-25"
+    price_verified: "2026-10-29"
     price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
 
   # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
@@ -1945,8 +1957,8 @@ models:
   - name: mistral-large-4
     provider: mistral
     id: mistral-large-4
-    weights: pending             # mistral.ai/news/mistral-large-4: "Weights drop end of this month"; no HF repo 2026-10-12
-    weights_license: "Not yet named; weights due end of October 2026"
+    # weights: was pending (preview advertised as open-weight). 2026-10-29: the weights
+    # released are a later checkpoint's (mistral-large-4-1029), so this one is closed.
     base_url: https://api.mistral.ai/v1
     label: "Mistral Large 4"
     availability: preview        # mistral.ai/news/mistral-large-4: "public preview" (2026-10-12)
@@ -1969,6 +1981,47 @@ models:
     max_tokens: 65536
     price_verified: "2026-10-25"
     price_source: "https://mistral.ai/news/mistral-large-4"
+    superseded_by: mistral-large-4-1029  # same id, later checkpoint (2026-10-29)
+
+  # Mistral Large 4, 2026-10-29 checkpoint. Mistral released the weights on
+  # 2026-10-29 (mistral.ai/news/mistral-large-4-oss: the preview after "three weeks
+  # of additional reinforcement learning", "the weights of this improved Mistral
+  # Large 4"). The API id did not change (mistral-large-4, alias mistral-large-4-0)
+  # and the HF README says the released model "is also served on the Mistral API
+  # ... as mistral-large-4", so the id now serves this checkpoint and the preview
+  # the board scored can no longer be called. Mistral's /v1/models `created` is the
+  # time of the request (all 64 models carry the same stamp, checked 2026-10-29), so
+  # it dates nothing. Supporting sign: on the sizing probe's five cases this
+  # checkpoint's longest answers were 40-60% shorter than the preview's (14,985 vs
+  # 25,203 tokens at most). A checkpoint swap behind the same id is a
+  # new version (David, 2026-10-29): it answers fresh and supersedes the preview row,
+  # a generation pair tested as its own family of one. Labels cannot infer it
+  # (_lineage reads "mistral large (oct 29)" vs "mistral large"), hence the explicit
+  # superseded_by above. Registered 2026-10-29 before any answer.
+  # HF mistralai/Mistral-Large-4-1T-A52B: 54 safetensors, ungated, updated 2026-10-29;
+  # its README says the model "is also served on the Mistral API ... as
+  # mistral-large-4". docs.mistral.ai/models/mistral-large-4-0 still says "Public
+  # Preview" (2026-10-29), so availability stays preview. Reasoning efforts
+  # low/medium/high, default high (HF README); the harness sends none, per policy.
+  - name: mistral-large-4-1029
+    provider: mistral
+    id: mistral-large-4
+    weights: open                # huggingface.co/mistralai/Mistral-Large-4-1T-A52B (checked 2026-10-29)
+    weights_license: "Mistral Ecosystem Open-Weight License (MIT-style; Model-as-a-Service businesses need a commercial licence)"
+    base_url: https://api.mistral.ai/v1
+    label: "Mistral Large 4 (Oct 29)"
+    availability: preview        # docs.mistral.ai/models/mistral-large-4-0: "Public Preview" (2026-10-29)
+    released: "2026-10-29"       # mistral.ai/news/mistral-large-4-oss (weights + updated checkpoint)
+    price_in: 0.7
+    price_out: 2.1
+    price_cached_in: 0.07
+    api: chat_completions
+    structured_outputs: true     # strict json_schema accepted (sizing probe 2026-10-29)
+    batch_supported: true        # one-request batch job SUCCESS 2026-10-29 (notes/ml4-1029-2026-10-29/batch_probe.out)
+    batch_discount: 0.5
+    max_tokens: 65536            # sizing probe 2026-10-29: peak 14,985 of 65,536 (23%), notes/ml4-1029-2026-10-29/
+    price_verified: "2026-10-29"
+    price_source: "https://docs.mistral.ai/models/mistral-large-4-0"
 
   # Beam (Reflection AI) — 12th lab, added 2026-10-12 (David: "add it to the eval").
   # reflection.ai/blog/introducing-beam (2026-10-05): 501B-total / 23B-active MoE,
