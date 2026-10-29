@@ -1316,8 +1316,8 @@ def test_rank_sets_refuse_a_p_first_from_a_different_lineup():
 def test_availability_reads_the_vendor_labels_from_the_registry():
     amap = lb.availability()
     assert amap == {"gemini-3.1-pro": "preview", "gemini-3-flash": "preview",
-                    "mistral-large-4": "preview", "muse-wonder-1.0": "preview",
-                    "beam-501b-a23b": "beta"}
+                    "mistral-large-4": "preview", "mistral-large-4-1029": "preview",
+                    "muse-wonder-1.0": "preview", "beam-501b-a23b": "beta"}
 
 
 def test_availability_tag_renders_on_every_surface_and_only_when_set():
