@@ -2304,6 +2304,8 @@ _FIELD_NARROW_TICK_STEP = 10
 _FIELD_LABEL_PX = 14            # .flabel size, for the narrow column estimate
 _FIELD_LABEL_EM = 0.52          # average advance of a label glyph, in ems
 _FIELD_NARROW_LABEL_MIN, _FIELD_NARROW_LABEL_MAX = 112, 176
+_FIELD_WIDE_LABEL_X = 186       # WIDE: right edge of the name column, at minimum
+_FIELD_WIDE_LABEL_PAD = 8       # WIDE: air left of the longest name
 _FIELD_BAND_LINE_H = 17         # caption line pitch inside the band
 _FIELD_BAND_PAD = 10            # band caption padding, top and bottom
 _FIELD_BAND_GAP = 8             # air between the band and the next row
@@ -2320,15 +2322,18 @@ class _ExtraColumn(Enum):
 
 def _field_geom(layout: _FieldLayout, labels: list[str], column: _ExtraColumn) -> _FieldGeom:
     """Columns for a layout. A phone has no room for a price column, and its
-    name column is sized to the longest label rather than fixed."""
+    name column is sized to the longest label rather than fixed. WIDE keeps
+    its fixed name column unless a label (with its tag) would run off the
+    left edge, then widens it and narrows the plot."""
     extra = column is _ExtraColumn.SHOWN
+    longest = max((len(t) for t in labels), default=0) * _FIELD_LABEL_PX * _FIELD_LABEL_EM
     if layout is _FieldLayout.WIDE:
-        return _FieldGeom(vw=960, label_x=186, plot_left=200,
+        label_x = max(_FIELD_WIDE_LABEL_X, round(longest) + _FIELD_WIDE_LABEL_PAD)
+        return _FieldGeom(vw=960, label_x=label_x, plot_left=label_x + 14,
                           plot_right=748 if extra else 868, score_x=808 if extra else 920,
                           extra_x=956 if extra else None, row_h=30, mark_r=5.0,
                           top=_FIELD_WIDE_TOP, tick_step=_FIELD_TICK_STEP,
                           head_y=_FIELD_WIDE_TOP - _FIELD_TICK_RISE)
-    longest = max((len(t) for t in labels), default=0) * _FIELD_LABEL_PX * _FIELD_LABEL_EM
     names = min(_FIELD_NARROW_LABEL_MAX, max(_FIELD_NARROW_LABEL_MIN, longest))
     # With a second number column (rank in group), the score moves left so a
     # two-digit range ("10-19") never runs into it: score ends at 304, the
@@ -2440,7 +2445,11 @@ def _score_field_svg(ranked: list[dict], layout: _FieldLayout) -> str:
         return ""
     priced = layout is _FieldLayout.WIDE
     column = _ExtraColumn.SHOWN if priced else _ExtraColumn.NONE
-    g = _field_geom(layout, [r["label"] for r in rows], column)
+    # On WIDE the availability tag ("preview") sits after the name, so it
+    # counts toward the name column; a space stands in for its 6-unit gap.
+    amap = availability() if priced else {}
+    labels = [f'{r["label"]} {amap.get(r["name"]) or ""}'.rstrip() for r in rows]
+    g = _field_geom(layout, labels, column)
     x0, x1 = _field_domain(rows)
     n_band = _field_band(rows)
     caption = _field_caption_lines(n_band, layout) if n_band else []
