@@ -1598,7 +1598,7 @@ def test_link_preview_leads_with_the_result():
     run = dict(_fake_run("2026-10-24", "ab" * 32, rows), naive_floor=52.6)
     text = lb._share_description(run, rows)
     assert text == ("3 of 6 models could rank #1; Model A has the top point score, 90.0. "
-                    "6 current frontier models scored on 50 real product decisions "
+                    "6 models scored on 50 real product decisions "
                     "(Restraint, Honesty, Conviction); run 2026-10-24.")
     assert "floor" not in text
     empty = lb._share_description(_fake_run("2026-10-24", "ab" * 32, []), [])

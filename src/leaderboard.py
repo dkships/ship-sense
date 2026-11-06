@@ -3908,7 +3908,10 @@ def _share_description(run: dict, ranked: list[dict]) -> str:
                       f"{top['label']} has the top point score, {top['score']['value']:.1f}")
     else:
         result = "No ranked models"
-    return (f"{result}. {n_models} current frontier models scored on {bank_n} real product "
+    total = sum(not m.get("is_baseline") for m in run.get("models", [])) or n_models
+    scope = (f"{total} models ({n_models} current, {total - n_models} earlier releases)"
+             if total > n_models else f"{n_models} models")
+    return (f"{result}. {scope} scored on {bank_n} real product "
             f"decisions (Restraint, Honesty, Conviction); run {date}.")
 
 
