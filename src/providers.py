@@ -52,6 +52,9 @@ API_KEY_ENV_BY_PROVIDER = {
     # Reflection's docs name it REFLECTION_API_KEY; this repo's .env stores it as
     # BEAM_API_KEY (added 2026-10-12).
     "reflection": "BEAM_API_KEY",
+    # Thinking Machines serves Inkling through Tinker; one Tinker key covers
+    # training and inference (added 2026-11-06).
+    "thinkingmachines": "TINKER_API_KEY",
 }
 
 
@@ -811,7 +814,7 @@ class GoogleProvider(_SDKProvider):
 # Labs served by OpenAI's SDK against their own base_url (models.yaml).
 OPENAI_COMPATIBLE_PROVIDERS = frozenset({
     "openai", "xai", "meta", "moonshot", "qwen", "deepseek", "zai", "mistral",
-    "reflection",
+    "reflection", "thinkingmachines",
 })
 
 

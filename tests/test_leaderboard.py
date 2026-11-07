@@ -696,6 +696,7 @@ def test_lineage_reads_a_vendors_v_prefixed_version():
 # so a successor needs an explicit superseded_by in models.yaml.
 _UNVERSIONED_VENDOR_LABELS = {
     "Beam",          # Reflection, 2026-10-12
+    "Inkling",       # Thinking Machines, 2026-11-06
     "GPT-4o",        # OpenAI's own names; 2026-10-24 older models for the v4.6 progression run,
     "GPT-4o mini",   # each with an explicit superseded_by in models.yaml
     "o3",
@@ -1247,7 +1248,7 @@ def test_labs_past_the_hue_limit_get_a_distinct_mark():
         assert f'--{lab})"]' in lb.CSS, lab
         assert (f'<i style="background:var(--{lab})"></i>{lb._PROVIDER_NAME[lab]}'
                 in legend), lab
-    assert set(lb._PROVIDER_SHAPE) == {"minimax", "mistral", "reflection"}
+    assert set(lb._PROVIDER_SHAPE) == {"minimax", "mistral", "reflection", "thinkingmachines"}
     assert len(set(lb._PROVIDER_SHAPE.values())) == len(lb._PROVIDER_SHAPE)
 
 
@@ -1339,6 +1340,8 @@ def test_chart_points_use_the_legend_mark_for_each_lab():
     assert lb._svg_mark("minimax", 10, 10).startswith("<path")
     assert lb._svg_mark("reflection", 10, 10).startswith("<path")
     assert lb._PROVIDER_INK["reflection"] in lb._svg_mark("reflection", 10, 10)
+    assert lb._svg_mark("thinkingmachines", 10, 10).startswith("<path")
+    assert lb._PROVIDER_INK["thinkingmachines"] in lb._svg_mark("thinkingmachines", 10, 10)
 
 
 def test_board_date_says_when_a_late_model_was_merged_in():
@@ -1410,6 +1413,19 @@ def test_weights_chart_marks_the_closed_models_decisively_above_the_best_open():
     closed_two = next(r for r in rows if r.startswith("<title>Closed Two"))
     assert "&#9650;" in closed_one and "&#9650;" not in closed_two
     assert "decisively above it" in svg
+
+
+def test_readme_weights_legend_defines_weights_due_only_when_a_row_carries_it(monkeypatch):
+    """The open-weight table's footnote defines the "weights due" tag; once the
+    last pending model ships its weights, the definition would describe nothing."""
+    open_one = _fake_model("open-1", "Open One", "zai", 90.0)
+    closed_one = _fake_model("closed-1", "Closed One", "openai", 94.0)
+    ranked = lb.rank_with_ties([closed_one, open_one])
+    for status, defined in ((lb.WEIGHTS_OPEN, False), (lb.WEIGHTS_PENDING, True)):
+        monkeypatch.setattr(lb, "weights", lambda s=status: {"open-1": s})
+        md = "\n".join(lb._weights_markdown(ranked, []))
+        assert "Open One" in md
+        assert ("<i>weights due</i> = released" in md) is defined, status
 
 
 def test_readme_charts_carry_a_title_unit_and_source(tmp_path, monkeypatch):
