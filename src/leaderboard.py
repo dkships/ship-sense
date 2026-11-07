@@ -1117,7 +1117,7 @@ def _md_inline(s: str) -> str:
     return s
 
 
-# One ink per lab, shared by every surface (page, README charts, card). Twelve
+# One ink per lab, shared by every surface (page, README charts, card). Thirteen
 # hues cannot all pass an all-pairs check, so identity never rides on hue alone.
 # Floors: normal-vision ΔE >= 15 is the hard gate; CVD ΔE >= 6.0 between inks,
 # with 6-8 legal only beside a secondary encoding. Validator, surface #fcfcfb,
@@ -1127,13 +1127,20 @@ def _md_inline(s: str) -> str:
 #     under 3:1 on the paper, and no lab ink paints an unlabelled solo mark: on
 #     unlabelled charts only focus marks (record-setters, the top group) wear lab
 #     ink, everything else is the quiet token, and every chart has a table twin.
-#   - Shape: labs 10-12 (MiniMax diamond, Mistral square, Reflection triangle)
-#     add a mark shape (_PROVIDER_SHAPE), the encoding dichromat readers rely on.
-#   - A 13th lab has no hue left: facet or group, do not add an ink.
+#   - Shape: labs 10-13 (MiniMax diamond, Mistral square, Reflection triangle,
+#     Thinking Machines cross) add a mark shape (_PROVIDER_SHAPE), the encoding
+#     dichromat readers rely on.
+#   - Thinking Machines (2026-11-06) took the one hue left that clears the
+#     normal-vision floor against all twelve: #ff8c9f, worst normal ΔE 15.6
+#     (Z.ai; Moonshot 16.0 next), inside the lightness band. Its worst CVD pair is
+#     OpenAI at 4.8 (deutan), the Reflection-Moonshot class, so it wears the
+#     cross; at 2.15:1 it joins the relief list. The palette's worst pairs are
+#     unchanged (CVD 4.3, normal 15.2).
+#   - A 14th lab has no hue left: facet or group, do not add an ink.
 # Meta moved #526200 -> #2b5f11 in v4.6, lifting the top-group labs' CVD floor
 # from 6.9 to 8.6. Re-validate before changing any value:
 #   node <dataviz>/scripts/validate_palette.js \
-#     "#c15f3c,#10a37f,#3d6fc4,#8e3b78,#2b5f11,#d5a33d,#5910c6,#33aaff,#b675bd,#c813ec,#fa2ea5,#19c20a" \
+#     "#c15f3c,#10a37f,#3d6fc4,#8e3b78,#2b5f11,#d5a33d,#5910c6,#33aaff,#b675bd,#c813ec,#fa2ea5,#19c20a,#ff8c9f" \
 #     --mode light --surface "#fcfcfb" --pairs all
 # How each ink was chosen (sweeps, rejected candidates) is in the maintainer's
 # private notes, not here.
@@ -1141,21 +1148,22 @@ _PROVIDER_INK = {"anthropic": "#c15f3c", "openai": "#10a37f", "google": "#3d6fc4
                  "xai": "#8e3b78", "meta": "#2b5f11", "moonshot": "#d5a33d",
                  "qwen": "#5910c6", "deepseek": "#33aaff", "zai": "#b675bd",
                  "minimax": "#c813ec", "mistral": "#fa2ea5",
-                 "reflection": "#19c20a"}
+                 "reflection": "#19c20a", "thinkingmachines": "#ff8c9f"}
 # Mark shape per lab; absent = the round dot every earlier lab keeps. The page
 # applies it through _shape_css (selectors keyed on the ink, so every dot the
 # renderers already paint picks it up), the card and the charts through _svg_mark.
 _SHAPE_DIAMOND = "diamond"
 _SHAPE_SQUARE = "square"
 _SHAPE_TRIANGLE = "triangle"
+_SHAPE_CROSS = "cross"
 _PROVIDER_SHAPE = {"minimax": _SHAPE_DIAMOND, "mistral": _SHAPE_SQUARE,
-                   "reflection": _SHAPE_TRIANGLE}
+                   "reflection": _SHAPE_TRIANGLE, "thinkingmachines": _SHAPE_CROSS}
 # xAI's docs have rebranded to "SpaceXAI"; the API still reports owned_by: "xai".
 _PROVIDER_NAME = {"anthropic": "Anthropic", "openai": "OpenAI", "google": "Google",
                   "xai": "xAI", "meta": "Meta", "moonshot": "Moonshot",
                   "qwen": "Qwen", "deepseek": "DeepSeek", "zai": "Z.ai",
                   "minimax": "MiniMax", "mistral": "Mistral",
-                  "reflection": "Reflection"}
+                  "reflection": "Reflection", "thinkingmachines": "Thinking Machines"}
 
 
 def _provider_color(provider: str | None) -> str:
@@ -1902,7 +1910,9 @@ def _shape_css() -> str:
     # border-radius with higher specificity and would round the mark back.
     rules = {_SHAPE_DIAMOND: "border-radius:1px!important;transform:rotate(45deg) scale(.86)",
              _SHAPE_SQUARE: "border-radius:2px!important",
-             _SHAPE_TRIANGLE: "border-radius:0!important;clip-path:polygon(50% 0,100% 100%,0 100%)"}
+             _SHAPE_TRIANGLE: "border-radius:0!important;clip-path:polygon(50% 0,100% 100%,0 100%)",
+             _SHAPE_CROSS: ("border-radius:0!important;clip-path:polygon(30% 0,70% 0,70% 30%,"
+                            "100% 30%,100% 70%,70% 70%,70% 100%,30% 100%,30% 70%,0 70%,0 30%,30% 30%)")}
     out = []
     for lab, shape in _PROVIDER_SHAPE.items():
         out.append(f'.dot[style*="{_PROVIDER_INK[lab]}"],'
@@ -2260,6 +2270,12 @@ def _svg_mark(provider: str | None, cx: float, cy: float, r: float = 5.0,
         d = r * 1.2
         return (f'<path d="M{cx:.1f} {cy - d:.1f}L{cx + d:.1f} {cy + d * .8:.1f}'
                 f'L{cx - d:.1f} {cy + d * .8:.1f}Z" {paint}/>')
+    if shape == _SHAPE_CROSS:
+        # A filled plus: arms d from the centre, each 2w wide.
+        d, w = r * 1.2, r * 0.48
+        return (f'<path d="M{cx - w:.1f} {cy - d:.1f}H{cx + w:.1f}V{cy - w:.1f}'
+                f'H{cx + d:.1f}V{cy + w:.1f}H{cx + w:.1f}V{cy + d:.1f}H{cx - w:.1f}'
+                f'V{cy + w:.1f}H{cx - d:.1f}V{cy - w:.1f}H{cx - w:.1f}Z" {paint}/>')
     return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:g}" {paint}/>'
 
 
@@ -4726,11 +4742,14 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
         lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))}{due} "
                      f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
                      f"| {_rank_range(r)} | {_price_md(r)} | {lic.get(r['name'], '—')} |")
+    # Define the tag only while some row carries it.
+    any_due = any(wmap.get(r["name"]) == WEIGHTS_PENDING for r in open_rows)
+    due_legend = (" · <i>weights due</i> = released and advertised as open-weight, weights "
+                  "not yet downloadable on the run date" if any_due else "")
     lines.append("")
     lines.append("<sub>Open-weight = the weights for this exact version are published under "
                  "an open license (not the same as open source, which also needs training "
-                 "code and data detail) · <i>weights due</i> = released and advertised as "
-                 "open-weight, weights not yet downloadable on the run date · rank in group = "
+                 f"code and data detail){due_legend} · rank in group = "
                  "95% rank confidence set from the same paired tests, Holm-corrected within "
                  "the group · the leaders are picked by point score, so their gap describes "
                  "this lineup, not open-weight against closed models in general.</sub>")

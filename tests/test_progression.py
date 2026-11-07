@@ -211,7 +211,7 @@ def test_frontier_labels_keep_the_current_best():
 # Surfaces
 # --------------------------------------------------------------------------- #
 def test_hollow_mark_keeps_each_labs_shape():
-    for provider in ("anthropic", "minimax", "mistral", "reflection"):
+    for provider in ("anthropic", "minimax", "mistral", "reflection", "thinkingmachines"):
         solid = lb._svg_mark(provider, 10, 10, 4)
         hollow = lb._svg_mark(provider, 10, 10, 4, lb._MarkFill.HOLLOW)
         assert solid.split(" ")[0] == hollow.split(" ")[0]   # same element
