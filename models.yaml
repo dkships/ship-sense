@@ -1949,7 +1949,7 @@ models:
     timeout_s: 900
     batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
     price_verified: "2026-11-09"
-    price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
+    price_source: "https://platform.minimax.io/docs/pricing/overview"
 
   # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
   # The flagship: docs.mistral.ai models overview calls it "frontier-class".
