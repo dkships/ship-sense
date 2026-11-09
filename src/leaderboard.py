@@ -1164,6 +1164,24 @@ _PROVIDER_NAME = {"anthropic": "Anthropic", "openai": "OpenAI", "google": "Googl
                   "qwen": "Qwen", "deepseek": "DeepSeek", "zai": "Z.ai",
                   "minimax": "MiniMax", "mistral": "Mistral",
                   "reflection": "Reflection", "thinkingmachines": "Thinking Machines"}
+# Lab origin: the country where the developing lab is headquartered, from the lab's
+# own legal pages (checked 2026-11-09). Not where its API is served or where data is
+# processed. Display-only, like the names above: the ledger never carries it, and a
+# test fails if a registered lab has none.
+ORIGIN_US = "U.S."
+ORIGIN_CHINA = "China"
+ORIGIN_FRANCE = "France"
+# Column order for the open-weight split: these first, then any other origin A-Z.
+_ORIGIN_ORDER = (ORIGIN_US, ORIGIN_CHINA)
+_PROVIDER_ORIGIN = {"anthropic": ORIGIN_US, "openai": ORIGIN_US, "google": ORIGIN_US,
+                    "xai": ORIGIN_US, "meta": ORIGIN_US, "reflection": ORIGIN_US,
+                    "thinkingmachines": ORIGIN_US, "moonshot": ORIGIN_CHINA,
+                    "qwen": ORIGIN_CHINA, "deepseek": ORIGIN_CHINA, "zai": ORIGIN_CHINA,
+                    "minimax": ORIGIN_CHINA, "mistral": ORIGIN_FRANCE}
+ORIGIN_NOTE = ("Origin is the country where the model&rsquo;s developer is headquartered, "
+               "per its own legal pages or filings (Google LLC for Gemini); it is not where "
+               "the API is served, which company you contract with (several Chinese labs "
+               "contract through Singapore companies), or where data is processed.")
 
 
 def _provider_color(provider: str | None) -> str:
@@ -1629,6 +1647,11 @@ h3{font:500 1.375rem/1.3 var(--sans);color:var(--ink);margin:0 0 8px}
 text-wrap:pretty}
 .note b{color:var(--text)}
 .wlede{color:var(--text);max-width:36em;margin:0 0 24px;text-wrap:pretty}
+#origins{margin-top:40px}
+.origins{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:16px;margin:8px 0 20px}
+.ocard{border-top:1px solid var(--ink);padding-top:8px}
+.ocard h4{font:600 1rem/1.3 var(--sans);color:var(--ink);margin:0 0 4px}
+.ocard ul{list-style:none;padding:0;margin:0;font-size:.875rem;line-height:1.55;color:var(--text)}
 .formula{margin:32px 0 0;color:var(--text);max-width:36em}
 
 /* ---- what we measure: three definitions as plain text ---- */
@@ -2614,6 +2637,120 @@ def weights_summary(open_rows: list[dict], closed_rows: list[dict],
             "n_closed": len(closed_rows)}
 
 
+def _origin_of(row: dict) -> str:
+    return _PROVIDER_ORIGIN.get(row["provider"], "")
+
+
+def _origins_in_order(rows: list[dict]) -> list[str]:
+    seen = {_origin_of(r) for r in rows} - {""}
+    rest = sorted(seen - set(_ORIGIN_ORDER))
+    return [o for o in _ORIGIN_ORDER if o in seen] + rest
+
+
+def _as_is(text: str) -> str:
+    """The identity escape, for Markdown output."""
+    return text
+
+
+def _score_desc(row: dict) -> float:
+    return -row["score"]["value"]
+
+
+def origin_split(open_rows: list[dict], closed_rows: list[dict],
+                 records: list[dict] | None) -> dict:
+    """Open-weight and closed models grouped by where their developer is based, and
+    the U.S.-against-China open-weight head to head: every cross pair that has a
+    paired record, read at the exploratory threshold (BH q <= 0.05) like the rest of
+    the section. Display only: no pair joins a family and nothing is pooled. A pair
+    with no record is skipped, never counted as not separated."""
+    origins = _origins_in_order(open_rows + closed_rows)
+    groups = {o: {"open": [r for r in open_rows if _origin_of(r) == o],
+                  "closed": [r for r in closed_rows if _origin_of(r) == o]}
+              for o in origins}
+    us_open = groups.get(ORIGIN_US, {}).get("open", [])
+    cn_open = groups.get(ORIGIN_CHINA, {}).get("open", [])
+    wins = {ORIGIN_US: [], ORIGIN_CHINA: []}
+    not_separated = n_pairs = 0
+    for cn in cn_open:
+        for us in us_open:
+            rec = _weights_record(cn["name"], us["name"], records)
+            if rec is None:
+                continue
+            n_pairs += 1
+            winner = rec.get("winner_exploratory")
+            if winner == cn["name"]:
+                wins[ORIGIN_CHINA].append((cn, us))
+                continue
+            if winner == us["name"]:
+                wins[ORIGIN_US].append((us, cn))
+                continue
+            not_separated += 1
+    return {"origins": origins, "groups": groups, "wins": wins,
+            "not_separated": not_separated, "n_pairs": n_pairs}
+
+
+def _and_join(items: list[str]) -> str:
+    """"A", "A and B", "A, B and C"."""
+    if len(items) <= 2:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _wins_text(pairs: list[tuple[dict, dict]], esc) -> str:
+    """"A over B and C; D over B": each winner once, winners and losers by score."""
+    winners = sorted({id(w): w for w, _ in pairs}.values(), key=_score_desc)
+    parts = []
+    for w in winners:
+        losers = sorted((l for x, l in pairs if x is w), key=_score_desc)
+        parts.append(f"{esc(w['label'])} over {_and_join([esc(l['label']) for l in losers])}")
+    return "; ".join(parts)
+
+
+def _origin_pairs_text(split: dict, esc, le: str) -> str:
+    """One sentence on the U.S.-China open-weight pairs; empty without both."""
+    n = split["n_pairs"]
+    if not n:
+        return ""
+    cn, us = split["wins"][ORIGIN_CHINA], split["wins"][ORIGIN_US]
+
+    def tally(wins: list) -> str:
+        return f"{len(wins)} ({_wins_text(wins, esc)})" if wins else "0"
+
+    return (f"U.S. against Chinese open-weight models, head to head (exploratory, BH q "
+            f"{le} 0.05): of the {n} pairs, the Chinese model is decisively ahead in "
+            f"{tally(cn)}, the U.S. model in {tally(us)}, and {split['not_separated']} "
+            f"are not separated. The counts depend on which models each lab has on the "
+            f"board, so they compare models, not countries.")
+
+
+def _origin_cell(rows: list[dict], esc, sep: str, dash: str) -> str:
+    """"5 · top score Kimi K3.1 Pro, 91.5 [89.1–93.6]", a lone model's own score, or
+    "none". "Top score", not "best": the group's top two may not be separated."""
+    if not rows:
+        return "none"
+    top = rows[0]
+    s = top["score"]
+    lead = "top score " if len(rows) > 1 else ""
+    return (f"{len(rows)} {sep} {lead}{esc(top['label'])}, {s['value']:.1f} "
+            f"[{s['lo']:.1f}{dash}{s['hi']:.1f}]")
+
+
+def _origin_html(split: dict) -> str:
+    """The page block: one card per origin, the U.S.-China sentence, the definition."""
+    cards = []
+    for o in split["origins"]:
+        g = split["groups"][o]
+        items = "".join(
+            f"<li>{kind}: {_origin_cell(g[key], escape, '&middot;', '&ndash;')}</li>"
+            for kind, key in (("Open-weight", "open"), ("Closed", "closed")))
+        cards.append(f'<div class="ocard"><h4>{escape(o)}</h4><ul>{items}</ul></div>')
+    pairs = _origin_pairs_text(split, escape, "&le;")
+    lede = f'<p class="wlede">{pairs}</p>' if pairs else ""
+    return (f'<h3 id="origins">By where the lab is based</h3>'
+            f'<div class="origins">{"".join(cards)}</div>{lede}'
+            f'<p class="note">{ORIGIN_NOTE}</p>')
+
+
 def _weights_lede(summary: dict, html: bool = True) -> str:
     """One sentence: the gap between the two groups' leaders, with its interval."""
     o, c, rec = summary["open"], summary["closed"], summary["record"]
@@ -2740,6 +2877,7 @@ def _weights_section(ranked: list[dict], records: list[dict] | None) -> str:
 <div class="fieldwrap">{svg}
 <p class="fcap">Shared axis &middot; dot = point score &middot; whisker = 95% CI &middot; dashed rule = best open-weight score &middot; &#9650; = decisively above it on the paired test (BH q &le; 0.05) &middot; right = rank range within the group.</p></div>
 <p class="note">Open-weight means this exact version&rsquo;s weights are published under an open license, or the vendor sells it as open-weight with the weights due. That is not open source, which also needs the training code and data.{pending_note} Group rank ranges use the main board&rsquo;s paired tests, Holm-corrected within the group. The leaders are picked by point score, so their gap describes this lineup, not open-weight models in general.{lic_note}</p>
+{_origin_html(origin_split(open_rows, closed_rows, records))}
 </section>"""
 
 
@@ -4745,12 +4883,13 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
     # Only the open-weight table: the closed models are the main table above,
     # and the chart already shows their in-group rank ranges.
     lic = weights_licenses()
-    lines += ["| # | Open-weight | Ship Sense Score (95% CI) | Rank in group | $/M in/out "
-              "| License |", "|---|---|---|---|---|---|"]
+    lines += ["| # | Open-weight | Lab origin | Ship Sense Score (95% CI) | Rank in group "
+              "| $/M in/out | License |", "|---|---|---|---|---|---|---|"]
     for r in open_rows:
         s = r["score"]
         due = " <i>weights due</i>" if wmap.get(r["name"]) == WEIGHTS_PENDING else ""
         lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))}{due} "
+                     f"| {_origin_of(r) or '—'} "
                      f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
                      f"| {_rank_range(r)} | {_price_md(r)} | {lic.get(r['name'], '—')} |")
     # Define the tag only while some row carries it.
@@ -4764,6 +4903,17 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
                  "95% rank confidence set from the same paired tests, Holm-corrected within "
                  "the group · the leaders are picked by point score, so their gap describes "
                  "this lineup, not open-weight against closed models in general.</sub>")
+    split = origin_split(open_rows, closed_rows, records)
+    lines += ["", "**By where the lab is based**", "",
+              "| Lab origin | Open-weight | Closed |", "|---|---|---|"]
+    for o in split["origins"]:
+        g = split["groups"][o]
+        lines.append(f"| {o} | {_origin_cell(g['open'], _as_is, '·', '–')} "
+                     f"| {_origin_cell(g['closed'], _as_is, '·', '–')} |")
+    pairs = _origin_pairs_text(split, _as_is, "≤")
+    if pairs:
+        lines += ["", pairs]
+    lines += ["", f"<sub>{ORIGIN_NOTE.replace('&rsquo;', chr(8217))}</sub>"]
     return lines
 
 
