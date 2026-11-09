@@ -113,6 +113,30 @@ defaults:
 # noted in a trailing comment. Dates verified May 2026.
 models:
   # --- Anthropic (frontier, previous frontier, mid, cheap) ---
+  - name: claude-fable-5-2
+    provider: anthropic
+    id: claude-fable-5-2
+    label: "Claude Fable 5.2"       # spaced so `_lineage` reads version 5.2 and retires "Claude Fable 5.1"
+    released: "2026-11-09"       # anthropic.com/news/claude-fable-and-mythos-5-2 ("available today
+                                 # on all platforms"), dated November 9, 2026; the model page says
+                                 # "Released November 9, 2026". Models API created_at 2026-11-09T18:30Z.
+                                 # Fable 5.1 stays callable as a legacy model; the Fable tier moves
+                                 # to 5.2 (one model per tier of the current API lineup).
+    price_in: 8                  # 20% BELOW the $10/$50 Fable 5.1 slot; cache read $0.20 (0.025x)
+    price_out: 40                # Shipped defaults on the Claude API: adaptive thinking always on
+                                 # (enabled/disabled return 400), effort `high` (unchanged from 5.1).
+                                 # Launch claim registered in hypotheses.yaml v4.6 (vs Opus 5.5).
+                                 # The FrontierCode (vs GPT-6 Astra) and RoboDojo (vs Astra and
+                                 # Fable 5.1) lines are single coding/robotics benchmarks, not this
+                                 # construct, so no pair is registered for them.
+    api: messages
+    structured_outputs: true
+    max_tokens: 32768            # sizing probe 2026-11-09 (claude-fable-5-1's 5 longest cases): peak 6,613 tokens,
+                                 # 81% of 8,192 (above the 70% line), 20% of 32,768; cap bounds thinking + answer
+    batch_supported: true        # probed against the Batch API 2026-11-09, not the docs
+    batch_discount: 0.5          # (notes/fable52-2026-11-09/batch_probe.out; haiku 4.5 control)
+    price_verified: "2026-11-09"
+    price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-fable-5-1
     provider: anthropic
     id: claude-fable-5-1
@@ -128,7 +152,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-01, not the docs
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-fable-5
     provider: anthropic
@@ -159,7 +183,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-22, not the docs
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-opus-5
     provider: anthropic
@@ -245,7 +269,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-28, not the docs
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-sonnet-5
     provider: anthropic
@@ -321,7 +345,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-10-07, not the docs
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.claude.com/docs/en/about-claude/pricing"
   - name: claude-haiku-4-5
     provider: anthropic
@@ -390,7 +414,7 @@ models:
     structured_outputs: true
     batch_supported: true        # probed 2026-09-04 against the Batch API itself, not read off the docs
     batch_discount: 0.5          # pricing page lists batch at $5 / $25 — exactly 50% off
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://developers.openai.com/api/docs/pricing"
   # GPT-6 Sol + Luna — announced 2026-09-22 (community.openai.com post dated
   # 09-22; openai.com/index/introducing-gpt-6-sol-and-luna returns 403 to fetch).
@@ -438,7 +462,7 @@ models:
     # Re-probed 2026-10-06 before the v4.3 run: BATCHABLE.
     batch_supported: true
     batch_discount: 0.5          # pricing page: batch $1 / $5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://developers.openai.com/api/docs/pricing"
   # GPT-6.1 Terra — announced 2026-10-26 (developers.openai.com/api/docs/changelog,
   # "a fast, efficient model for visual reasoning, precise computer use, and clear,
@@ -464,7 +488,7 @@ models:
     structured_outputs: true
     batch_supported: true        # model page lists v1/batch; probed before the run
     batch_discount: 0.5          # pricing page: batch $0.50 / $2.50
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
@@ -479,7 +503,7 @@ models:
     structured_outputs: true
     batch_supported: true        # model page lists v1/batch; re-probed before the run
     batch_discount: 0.5          # pricing page: batch $0.05 / $0.25
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-5.6-sol
     provider: openai
@@ -805,7 +829,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2026-12-01"
@@ -856,7 +880,7 @@ models:
                                  # (waived); models.get outputTokenLimit 65,536 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
@@ -936,7 +960,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
   - name: gemini-3-flash
     provider: google
@@ -1051,7 +1075,7 @@ models:
     batch_declined: true         # HARD rejection, probed 2026-09-21 with notes/batch_probe.py:
                                  # "Model grok-4.7 is not supported for batch processing" (4.6 same,
                                  # 4.3 control ACCEPTED). Re-probed 2026-10-24: ACCEPTED, as the docs' "20% off".
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://docs.x.ai/developers/pricing"
   - name: grok-4.6
     provider: xai
@@ -1349,7 +1373,7 @@ models:
                                  # 97% of 8,192 (11 calls above 70%); cap bounds reasoning + answer. The API
                                  # accepted 32,768 on 2026-10-24 (Muse Spark 1.1 and Muse Wonder 1.0 run at it)
     batch_supported: false       # re-probed 2026-09-02, see notes/session-log.md; 2026-10-07: "batch API not enabled"
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # Muse Wonder 1.0 — announced and added 2026-10-12 (about.fb.com/news/2026/10/
@@ -1389,7 +1413,7 @@ models:
     # answered bank items used 3,442-9,568 output tokens, so 8,192 would truncate.
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 9,568
     timeout_s: 900
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
 
   # --- Moonshot AI (OpenAI-compatible endpoint; https://api.moonshot.ai/v1) ---
@@ -1498,7 +1522,7 @@ models:
     timeout_s: 600
     batch_supported: false       # Batch docs list kimi-k2.7-code + kimi-k2.6 only (2026-10-23). 2026-11-06: Moonshot's batch
                                  # pricing now lists kimi-k3.1-pro at 60% of list; not probed - probe before its next run
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.kimi.ai/docs/pricing/chat-k3"
 
   # --- Qwen (Alibaba) — 7th lab, added 2026-08-03 (launch day) ---
@@ -1605,7 +1629,7 @@ models:
     # docs will not substitute for. Cost-estimate only; never reaches the board.
     # (Confirmed unchanged: cached_tokens sits INSIDE prompt_tokens -- "This value
     # is part of usage.prompt_tokens" -- so declaring price_cached_in stays safe.)
-    price_verified: "2026-11-06"   # price_in/price_out only; cached still open
+    price_verified: "2026-11-09"   # price_in/price_out only; cached still open
     price_source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
 
   # --- DeepSeek — 8th lab, added 2026-08-13 ---
@@ -1693,7 +1717,7 @@ models:
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
     timeout_s: 900
     batch_supported: false       # DeepSeek has no batch API at all (2026-10-07: /batches and /v1/batches 404)
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://api-docs.deepseek.com/quick_start/pricing"
     # PEAK/OFF-PEAK BILLING LANDED 2026-08-16, re-verified first-party 2026-08-19.
     # The pricing page now presents the split as CURRENT, with no transition
@@ -1843,7 +1867,7 @@ models:
     timeout_s: 240               # per chunk when streaming; a hang cost 45 min at 900 non-streamed
     batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed; re-probed
                                  # 2026-10-07: glm-5.3 still off the list (1210); glm-5.1 now needs ID verification (1000)
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://docs.z.ai/guides/overview/pricing"
 
   # --- MiniMax — 10th lab, added 2026-09-22 (MiniMax-M3, released 2026-06-01) ---
@@ -1924,7 +1948,7 @@ models:
     max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
     timeout_s: 900
     batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://platform.minimax.io/docs/guides/pricing-paygo"
 
   # Mistral Medium 3.5 — 11th lab, added to v4.0 on 2026-09-22 (David's call).
@@ -2030,7 +2054,7 @@ models:
     batch_supported: true        # one-request batch job SUCCESS 2026-10-29 (notes/ml4-1029-2026-10-29/batch_probe.out)
     batch_discount: 0.5
     max_tokens: 65536            # sizing probe 2026-10-29: peak 14,985 of 65,536 (23%), notes/ml4-1029-2026-10-29/
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://docs.mistral.ai/models/mistral-large-4-0"
 
   # Beam (Reflection AI) — 12th lab, added 2026-10-12 (David: "add it to the eval").
@@ -2121,7 +2145,7 @@ models:
     batch_supported: false       # probed 2026-11-06: GET /files and /batches 404, /models 200 (notes/inkling-2026-11-06/batch_probe.out)
     max_tokens: 32768            # sizing probe 2026-11-06 (rule 1: GLM-5.3's five longest cases): peak 10,063 of 32,768 (31%), 8,192 would be 123%; notes/inkling-2026-11-06/
     timeout_s: 900
-    price_verified: "2026-11-06"
+    price_verified: "2026-11-09"
     price_source: "https://tinker-docs.thinkingmachines.ai/tinker/models.json"
 
   # --- Deterministic, no network. Used by tests + scaffold + the gameability floor. ---
