@@ -1648,3 +1648,75 @@ def test_rank_cell_escapes_the_p_first_bounds_in_html():
     high = lb._rank_cell({"rank_lo": 1, "rank_hi": 1, "p_first": 0.996})
     assert "P(#1) &lt;1%" in low and "P(#1) <1%" not in low
     assert "P(#1) &gt;99%" in high and "P(#1) >99%" not in high
+
+
+def test_every_registered_lab_has_an_origin():
+    """The open-weight split groups labs by origin; a new lab without one would
+    silently fall out of it."""
+    _, registry = loader.load_models()
+    labs = {m["provider"] for m in registry if m["provider"] != "mock"}
+    assert labs <= set(lb._PROVIDER_ORIGIN), labs - set(lb._PROVIDER_ORIGIN)
+
+
+def _origin_fixture():
+    """Two U.S., two Chinese and one French open-weight model, one closed U.S. model.
+    The Chinese leader beats US One, US One beats the other Chinese model, and both
+    pairs with US Two are not separated."""
+    cn_top = _fake_model("cn-1", "CN One", "moonshot", 91.0)
+    fr = _fake_model("fr-1", "FR One", "mistral", 88.5)
+    us = _fake_model("us-1", "US One", "reflection", 88.0)
+    us_two = _fake_model("us-2", "US Two", "thinkingmachines", 87.0)
+    cn_low = _fake_model("cn-2", "CN Two", "minimax", 84.0)
+    closed = _fake_model("c-1", "Closed One", "anthropic", 97.0)
+
+    def rec(a, b, winner):
+        return {"a": a, "b": b, "delta": 0.03, "lo": 0.01, "hi": 0.06,
+                "winner_exploratory": winner}
+
+    records = [rec("cn-1", "us-1", "cn-1"), rec("us-1", "cn-2", "us-1"),
+               rec("cn-1", "us-2", None), rec("us-2", "cn-2", None)]
+    return (lb.rank_with_ties([cn_top, fr, us, us_two, cn_low]),
+            lb.rank_with_ties([closed]), records)
+
+
+def test_origin_split_names_each_labs_country_and_the_us_china_open_pairs():
+    open_rows, closed_rows, records = _origin_fixture()
+    html = lb._origin_html(lb.origin_split(open_rows, closed_rows, records))
+    assert "By where the lab is based" in html
+    # Fixed column order: U.S., China, then the rest.
+    assert html.index(">U.S.<") < html.index(">China<") < html.index(">France<")
+    # A score never prints without its interval, and the leader is "top score",
+    # not "best": the top two in a group may not be separated.
+    assert "top score CN One, 91.0 [87.0&ndash;95.0]" in html and "Closed: none" in html
+    text = re.sub(r"<[^>]+>", "", html)
+    assert ("of the 4 pairs, the Chinese model is decisively ahead in 1 (CN One over "
+            "US One), the U.S. model in 1 (US One over CN Two), and 2 are not separated"
+            in text)
+    assert "they compare models, not countries" in text
+    assert "headquartered" in text and "not where" in text
+
+
+def test_origin_split_drops_the_head_to_head_without_both_origins():
+    """No U.S. or no Chinese open-weight model: the cards stay, the sentence goes;
+    a pair with no paired record is skipped, never counted as not separated."""
+    open_rows, closed_rows, records = _origin_fixture()
+    no_us = [r for r in open_rows if r["provider"] not in ("reflection", "thinkingmachines")]
+    split = lb.origin_split(no_us, closed_rows, records)
+    assert split["n_pairs"] == 0
+    assert "head to head" not in lb._origin_html(split)
+    partial = lb.origin_split(open_rows, closed_rows, records[:2])
+    assert partial["n_pairs"] == 2 and partial["not_separated"] == 0
+
+
+def test_readme_open_weight_table_carries_the_lab_origin(monkeypatch):
+    open_rows, closed_rows, records = _origin_fixture()
+    ranked = lb.rank_with_ties([r for r in open_rows + closed_rows])
+    monkeypatch.setattr(lb, "weights", lambda: {n: lb.WEIGHTS_OPEN
+                                                for n in ("cn-1", "fr-1", "us-1", "us-2",
+                                                          "cn-2")})
+    md = "\n".join(lb._weights_markdown(ranked, records))
+    assert "| Lab origin |" in md
+    assert re.search(r"\*\*CN One\*\*.*\| China \|", md)
+    assert "the Chinese model is decisively ahead in 1" in md
+    assert "| Lab origin | Open-weight | Closed |" in md
+    assert "| China | 2 · top score CN One, 91.0 [87.0–95.0] | none |" in md

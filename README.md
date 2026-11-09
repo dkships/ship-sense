@@ -204,18 +204,30 @@ The highest-scoring open-weight model, **Kimi K3.1 Pro** (91.5), and the highest
 
 [![Open-weight models above and closed models below on one shared score axis; values in the tables below](docs/weights.svg)](https://dkships.github.io/ship-sense/#weights)
 
-| # | Open-weight | Ship Sense Score (95% CI) | Rank in group | $/M in/out | License |
-|---|---|---|---|---|---|
-| 1 | **Kimi K3.1 Pro** | **91.5** [89.1–93.6] | 1–2 | $2 / $10 | Kimi K3.1-Pro License (MIT-style; >$20M MaaS revenue needs an agreement) |
-| 2 | **GLM-5.3** | **89.7** [86.9–92.3] | 1–6 | $1.4 / $4.4 | GLM-5.3 License (MIT-style; >$10B MaaS needs a security review) |
-| 3 | **Mistral Large 4 (Oct 29)** <i>preview</i> | **88.0** [85.3–90.6] | 2–6 | $0.7 / $2.1 | Mistral Ecosystem Open-Weight License (MIT-style; Model-as-a-Service businesses need a commercial licence) |
-| 4 | **Beam 1.0** <i>beta</i> | **87.9** [85.2–90.5] | 2–6 | — | Apache 2.0 |
-| 5 | **Inkling** | **87.6** [84.9–90.2] | 2–8 | $1.87 / $4.68 | Apache 2.0 |
-| 6 | **DeepSeek V4 Pro** | **86.7** [83.8–89.5] | 2–8 | $1.32 / $3.96 | MIT |
-| 7 | **Qwen 3.8 Max** | **84.4** [81.5–87.1] | 5–8 | $2 / $6 | Qwen3.8-Max License (MIT-style; attribution and >$50M MaaS terms) |
-| 8 | **MiniMax M3** | **83.8** [80.8–86.6] | 6–8 | $0.3 / $1.2 | MiniMax Community License (non-commercial by default) |
+| # | Open-weight | Lab origin | Ship Sense Score (95% CI) | Rank in group | $/M in/out | License |
+|---|---|---|---|---|---|---|
+| 1 | **Kimi K3.1 Pro** | China | **91.5** [89.1–93.6] | 1–2 | $2 / $10 | Kimi K3.1-Pro License (MIT-style; >$20M MaaS revenue needs an agreement) |
+| 2 | **GLM-5.3** | China | **89.7** [86.9–92.3] | 1–6 | $1.4 / $4.4 | GLM-5.3 License (MIT-style; >$10B MaaS needs a security review) |
+| 3 | **Mistral Large 4 (Oct 29)** <i>preview</i> | France | **88.0** [85.3–90.6] | 2–6 | $0.7 / $2.1 | Mistral Ecosystem Open-Weight License (MIT-style; Model-as-a-Service businesses need a commercial licence) |
+| 4 | **Beam 1.0** <i>beta</i> | U.S. | **87.9** [85.2–90.5] | 2–6 | — | Apache 2.0 |
+| 5 | **Inkling** | U.S. | **87.6** [84.9–90.2] | 2–8 | $1.87 / $4.68 | Apache 2.0 |
+| 6 | **DeepSeek V4 Pro** | China | **86.7** [83.8–89.5] | 2–8 | $1.32 / $3.96 | MIT |
+| 7 | **Qwen 3.8 Max** | China | **84.4** [81.5–87.1] | 5–8 | $2 / $6 | Qwen3.8-Max License (MIT-style; attribution and >$50M MaaS terms) |
+| 8 | **MiniMax M3** | China | **83.8** [80.8–86.6] | 6–8 | $0.3 / $1.2 | MiniMax Community License (non-commercial by default) |
 
 <sub>Open-weight = the weights for this exact version are published under an open license (not the same as open source, which also needs training code and data detail) · rank in group = 95% rank confidence set from the same paired tests, Holm-corrected within the group · the leaders are picked by point score, so their gap describes this lineup, not open-weight against closed models in general.</sub>
+
+**By where the lab is based**
+
+| Lab origin | Open-weight | Closed |
+|---|---|---|
+| U.S. | 2 · top score Beam 1.0, 87.9 [85.2–90.5] | 14 · top score Claude Fable 5.2, 97.0 [95.5–98.4] |
+| China | 5 · top score Kimi K3.1 Pro, 91.5 [89.1–93.6] | none |
+| France | 1 · Mistral Large 4 (Oct 29), 88.0 [85.3–90.6] | none |
+
+U.S. against Chinese open-weight models, head to head (exploratory, BH q ≤ 0.05): of the 10 pairs, the Chinese model is decisively ahead in 2 (Kimi K3.1 Pro over Beam 1.0 and Inkling), the U.S. model in 4 (Beam 1.0 over Qwen 3.8 Max and MiniMax M3; Inkling over Qwen 3.8 Max and MiniMax M3), and 4 are not separated. The counts depend on which models each lab has on the board, so they compare models, not countries.
+
+<sub>Origin is the country where the model’s developer is headquartered, per its own legal pages or filings (Google LLC for Gemini); it is not where the API is served, which company you contract with (several Chinese labs contract through Singapore companies), or where data is processed.</sub>
 
 ### Score history
 
