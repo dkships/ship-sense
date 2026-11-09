@@ -1619,3 +1619,32 @@ def test_link_preview_leads_with_the_result():
     assert "floor" not in text
     empty = lb._share_description(_fake_run("2026-10-24", "ab" * 32, []), [])
     assert empty.startswith("No ranked models.")
+
+
+def test_p_first_text_never_rounds_a_share_to_certainty_or_to_zero():
+    """A share of 0.996 is not 100%, and 0.002 is not 0%: rounding either way
+    states a certainty the bootstrap does not support."""
+    assert lb._p_first_text({"p_first": 0.996}) == ">99%"
+    assert lb._p_first_text({"p_first": 0.0021}) == "<1%"
+    assert lb._p_first_text({"p_first": 1.0}) == "100%"
+    assert lb._p_first_text({"p_first": 0.0}) == "0%"
+    assert lb._p_first_text({"p_first": 0.4279}) == "43%"
+    assert lb._p_first_text({"p_first": None}) == "—"
+
+
+def test_phone_tables_let_long_model_labels_wrap():
+    """On a phone a label like "Mistral Large 4 (Oct 29)" must wrap inside its
+    cell, not run into the score column."""
+    css = lb.CSS.replace("\n", "")
+    assert "table:not(.hist):not(.matrix) .model .label{white-space:nowrap" not in css
+    assert "table:not(.hist):not(.matrix) .model .label{white-space:normal" in css
+    # ...while the column stays wide enough that short names keep one line.
+    assert "table:not(.hist):not(.matrix) .model{min-width:10rem}" in css
+
+
+def test_rank_cell_escapes_the_p_first_bounds_in_html():
+    """"<1%" and ">99%" are text, so the HTML cell must carry them escaped."""
+    low = lb._rank_cell({"rank_lo": 1, "rank_hi": 9, "p_first": 0.002})
+    high = lb._rank_cell({"rank_lo": 1, "rank_hi": 1, "p_first": 0.996})
+    assert "P(#1) &lt;1%" in low and "P(#1) <1%" not in low
+    assert "P(#1) &gt;99%" in high and "P(#1) >99%" not in high

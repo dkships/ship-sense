@@ -1349,7 +1349,7 @@ def _rank_cell(r: dict) -> str:
            "(a 95% rank confidence set). P(#1): share of re-drawn case sets in which this "
            "model scores highest.")
     return (f'<td class="rrange" title="{tip}"><span class="num">{_rank_range(r)}</span>'
-            f'<span class="ciq">P(#1) {_p_first_text(r)}</span></td>')
+            f'<span class="ciq">P(#1) {escape(_p_first_text(r))}</span></td>')
 
 
 def _model_row(r: dict, bank_n: int | None = None,
@@ -1883,8 +1883,8 @@ table:not(.hist):not(.matrix) th:nth-child(n+7),table:not(.hist):not(.matrix) td
 table:not(.hist):not(.matrix) th,table:not(.hist):not(.matrix) td{padding:10px 5px}
 table:not(.hist):not(.matrix) .rank{width:1.7rem;padding-right:6px}
 table:not(.hist):not(.matrix) thead th{white-space:normal}
-table:not(.hist):not(.matrix) .model{min-width:0}
-table:not(.hist):not(.matrix) .model .label{white-space:nowrap;font-size:.875rem}
+table:not(.hist):not(.matrix) .model{min-width:10rem}
+table:not(.hist):not(.matrix) .model .label{white-space:normal;font-size:.875rem}
 table:not(.hist):not(.matrix) .model .dot{margin-right:.4rem}
 .model abbr.avail{display:none}
 .model .avail-sub{display:inline}
@@ -2079,10 +2079,21 @@ def _rank_range(r: dict) -> str:
     return f'{r["rank_lo"]}–{r["rank_hi"]}'
 
 
+# P(#1) shares strictly between these and 0 or 1 would round to "0%" or "100%",
+# a certainty the bootstrap does not support; they print as "<1%" / ">99%".
+_P_FIRST_FLOOR = 0.005
+_P_FIRST_CEIL = 0.995
+
+
 def _p_first_text(r: dict) -> str:
-    if r.get("p_first") is None:
+    p = r.get("p_first")
+    if p is None:
         return "—"
-    return f'{r["p_first"] * 100:.0f}%'
+    if 0 < p < _P_FIRST_FLOOR:
+        return "<1%"
+    if _P_FIRST_CEIL <= p < 1:
+        return ">99%"
+    return f"{p * 100:.0f}%"
 
 
 def _contenders(ranked: list[dict]) -> list[dict]:
