@@ -837,6 +837,42 @@ models:
       price_in: 4
       price_out: 20
       source: "https://ai.google.dev/gemini-api/docs/pricing"
+  # Gemini 4 Carbon — generally available and added 2026-11-10 (blog.google
+  # gemini-4-carbon-now-available, dated November 10, 2026; an earlier limited release to
+  # security researchers two weeks before). Stable id, no preview suffix. The post calls it
+  # "our strongest model" and says Argon "remains the ideal choice for the majority of
+  # software engineering and knowledge work", so Carbon is a new top tier BESIDE Argon, not
+  # its successor: Google now has four current tiers (Carbon, Argon, 3.8 Flash, 3.5
+  # Flash-Lite), one model per tier; no superseded_by, no succession pair. Weights not released.
+  # Thinking levels low/medium/high, DEFAULT medium; we send no thinking setting. Thinking
+  # tokens bill as output (usage: thoughts_token_count, counted into output_tokens).
+  # Temperature/sampling ignored. Context 1,048,576; docs give max output 65,536 by default,
+  # while models.get on 2026-11-10 reports outputTokenLimit 32,768 (Argon reports the same).
+  # models.get (2026-11-10, notes/carbon-2026-11-10/facts_probe.out): served to this key,
+  # batchGenerateContent supported, model_version "gemini-4-carbon".
+  # LAUNCH CLAIM registered in hypotheses.yaml v4.7 before any bank item (vs Gemini 4 Argon).
+  # LABEL "Gemini 4 Carbon" parses to its own line ("gemini carbon"); Argon is not retired.
+  - name: gemini-4-carbon
+    provider: google
+    id: gemini-4-carbon
+    label: "Gemini 4 Carbon"
+    released: "2026-11-10"       # blog.google gemini-4-carbon-now-available (general availability)
+    price_in: 2                  # introductory through 2026-11-30; cached input $0.10 (then $0.20);
+    price_out: 10                # not on the free tier
+    api: generate_content
+    structured_outputs: true     # JSON response schema accepted 2026-11-10 (facts_probe.out)
+    max_tokens: 32768            # sizing probe 2026-11-10 (glm-5.3's 5 longest cases: no predecessor): peak
+                                 # 22,565 tokens, 69% of 32,768 (above 70% of 8,192); cap bounds thinking + answer
+    batch_supported: true        # probed against Google's Batch API 2026-11-10, not the docs
+    batch_discount: 0.5          # (notes/carbon-2026-11-10/batch_probe.out; gemini-4-argon control)
+    price_verified: "2026-11-10"
+    price_source: "https://aistudio.google.com/docs/pricing"
+    price_pending:
+      effective: "2026-12-01"
+      introductory: true      # vendor-announced launch price; the board marks it
+      price_in: 4
+      price_out: 20
+      source: "https://aistudio.google.com/docs/pricing"
   # Flash tiers offer Free Tier access, but official private-bank runs use paid
   # billing/Batch. Google's pricing terms say Free Tier content may be used to
   # improve products; do not send private cases through that path.
