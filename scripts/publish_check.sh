@@ -53,6 +53,23 @@ done
 # 3. Tests green (includes the docs/README/card drift guards + privacy guard).
 "$PY" -m pytest -q >/dev/null 2>&1 && ok "test suite passes" || bad "test suite fails"
 
+# 3b. The suite as public CI runs it: a fresh copy of the committed files only (no notes/,
+#     outputs/, private cases or keys, real preview cases), in its own git repository,
+#     run with this interpreter. A test that leans on a private file passes above and
+#     fails here (the v4.8 export failed public CI this way).
+py_abs="$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY")"
+public_copy="$(mktemp -d)"
+if git archive HEAD | tar -x -C "$public_copy" \
+   && (cd "$public_copy" && git init -q . && git add -A \
+       && git -c user.name=publish-check -c user.email=publish-check@localhost commit -qm copy) \
+   && (cd "$public_copy" && "$py_abs" -m pytest -q -p no:cacheprovider >/dev/null 2>&1); then
+  ok "test suite passes on a public copy (committed files only)"
+else
+  bad "test suite fails on a public copy (committed files only): rerun in $public_copy"
+  public_copy=""
+fi
+if [ -n "$public_copy" ]; then rm -rf "$public_copy"; fi
+
 # 4. Private-bank mechanical audit (strict only on source/provenance, not David sign-off).
 "$PY" -m src.bank_audit --strict >/dev/null 2>&1 && ok "bank audit passes" || bad "bank audit fails"
 
