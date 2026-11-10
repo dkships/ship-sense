@@ -1484,10 +1484,54 @@ def test_card_leads_with_the_finding_in_embedded_fonts(tmp_path, monkeypatch):
     assert "src:url(data:font/woff;base64," in svg
     head = re.search(r'<text[^>]*font-family="Newsreader[^"]*"[^>]*>([^<]+)<', svg)
     assert head and head.group(1) == escape(lb.CARD_TIE_LINE.format(n=3, m=6))
-    # One interval bar per top-group model, at the CARD_CI_W stroke.
-    assert svg.count(f'stroke-width="{lb._CARD_CI_W}"') == 3
+    # One interval bar per top-group model; a group this short draws them at
+    # the tall stroke.
+    assert svg.count(f'stroke-width="{lb._CARD_TALL_CI_W:g}"') == 3
     assert "#0f766e" not in svg
     assert lb.CARD_URL in svg and lb.CARD_AUTHOR in svg
+
+
+def test_card_rows_open_up_when_few_models_could_rank_first():
+    """Three contenders sat in a 120 px strip at the top of a 300 px column,
+    leaving the left half of the card empty; few rows now take a looser
+    pitch, and a full group keeps the tight one."""
+    def pitch(n):
+        group = [_fake_model(f"m{i}", f"Model {i}", "openai", 94.0 - i * 0.3) for i in range(n)]
+        ys = [float(y) for y in re.findall(r'<line x1="[\d.]+" y1="([\d.]+)" x2="[\d.]+" '
+                                           r'y2="\1" stroke="#', lb._card_rows(group))]
+        return ys[1] - ys[0]
+    assert pitch(3) > 1.5 * lb._CARD_ROW_PITCH
+    assert pitch(9) == lb._CARD_ROW_PITCH
+
+
+def test_a_short_card_group_fills_the_column_in_larger_type():
+    """With 3 contenders the band still ended ~150 px above the footer while
+    the chart ran on: a group of 5 or fewer now fills down to the chart's plot
+    bottom, its ticks on the chart's date baseline, in the next type steps up
+    (names 24, scores 26) with heavier marks; a longer group keeps 22 px."""
+    def rows(n):
+        group = [_fake_model(f"m{i}", f"Model {i}", "openai", 94.0 - i * 0.3) for i in range(n)]
+        return lb._card_rows(group)
+
+    def band_bottom(svg):
+        m = re.search(r'<rect [^>]*y="(\d+)" [^>]*height="([\d.]+)"', svg)
+        return float(m.group(1)) + float(m.group(2))
+
+    def size(svg, text):
+        return float(re.search(r'font-size="([\d.]+)"[^>]*>' + re.escape(text) + "<",
+                               svg).group(1))
+
+    short = rows(3)
+    assert band_bottom(short) == lb._CARD_PLOT_BOTTOM
+    assert size(short, "Model 0") == lb._CARD_CHART_TITLE_PX
+    assert size(short, "94.0") == lb._CARD_TITLE_PX
+    tick_y = re.search(r'y="([\d.]+)" text-anchor="middle"[^>]*>95<', short).group(1)
+    assert float(tick_y) == lb._CARD_PLOT_BOTTOM + lb._CARD_DATE_GAP
+    widths = {float(w) for w in re.findall(r'stroke-width="([\d.]+)" stroke-linecap', short)}
+    assert widths and min(widths) > lb._CARD_CI_W
+    full = rows(9)
+    assert band_bottom(full) < lb._CARD_PLOT_BOTTOM
+    assert size(full, "Model 0") == size(full, "94.0") == lb.CARD_MIN_FONT_PX
 
 
 def test_card_headline_shrinks_to_fit_a_longer_line():
@@ -1581,6 +1625,38 @@ def test_phone_weights_chart_keeps_score_rank_and_marks_apart():
     ticks = {float(y) for y in re.findall(r'<text x="[\d.]+" y="([\d.]+)" text-anchor="middle" '
                                           r'class="ftick">\d+</text>', svg)}
     assert float(head.group(1)) not in ticks
+
+
+def test_phone_weights_flag_clears_a_score_near_the_top():
+    """On a phone the ▲ beside an interval that reaches 98.4 touched "97.0"
+    (read as "▲97.0"): the 11-09 board, a long open-weight name narrowing the plot."""
+    open_rows = lb.rank_with_ties([_fake_model("open-1", "Mistral Large 4 (Oct 29)", "zai",
+                                               88.0)])
+    top = _fake_model("c-0", "Top", "anthropic", 97.0)
+    top["score"] = dict(top["score"], lo=95.5, hi=98.4)
+    closed_rows = lb.rank_with_ties([top, _fake_model("c-1", "Low", "openai", 79.0)])
+    for r in open_rows + closed_rows:
+        r["rank_lo"], r["rank_hi"] = 1, 1
+    records = [{"a": "c-0", "b": "open-1", "delta": 0.09, "lo": 0.05, "hi": 0.12,
+                "winner_exploratory": "c-0"}]
+    svg = lb._weights_svg(open_rows, closed_rows, records, lb._FieldLayout.NARROW)
+    row = svg.split('<g class="frow"><title>Top — ')[1].split("</g>")[0]
+    score_left, _, _ = _text_extent(row, "97.0")
+    flag = re.search(r'<text x="([\d.]+)" y="[\d.]+" class="fnum">&#9650;</text>', row)
+    assert float(flag.group(1)) + 14 * _CHART_DIGIT_EM + 4 <= score_left
+
+
+def test_phone_board_keeps_the_version_tag_on_one_line():
+    """On a phone "Anthropic · tested on v4.6" wrapped as "... tested on" /
+    "v4.6": the tag is its own span, kept whole and given its own line."""
+    m = _fake_model("a", "A", "anthropic", 90.0)
+    m["bench_version"] = "v4.6"
+    row = lb._model_row(lb.rank_with_ties([m])[0])
+    assert ('<span class="tver"><span class="tsep"> &middot; </span>tested on v4.6</span>'
+            in row)
+    phone = lb.CSS.split("@media(max-width:760px){")[1]
+    assert ".model .tver{display:block}" in phone and ".model .tsep{display:none}" in phone
+    assert ".model .tver{white-space:nowrap}" in lb.CSS
 
 
 def test_page_preloads_the_fonts_the_first_screen_uses():
@@ -1687,7 +1763,9 @@ def test_origin_split_names_each_labs_country_and_the_us_china_open_pairs():
     assert html.index(">U.S.<") < html.index(">China<") < html.index(">France<")
     # A score never prints without its interval, and the leader is "top score",
     # not "best": the top two in a group may not be separated.
-    assert "top score CN One, 91.0 [87.0&ndash;95.0]" in html and "Closed: none" in html
+    # The interval never breaks mid-range ("[89.1–" / "93.6]" on a phone).
+    assert ("top score CN One, 91.0 [87.0&#8288;&ndash;&#8288;95.0]" in html
+            and "Closed: none" in html)
     text = re.sub(r"<[^>]+>", "", html)
     assert ("of the 4 pairs, the Chinese model is decisively ahead in 1 (CN One over "
             "US One), the U.S. model in 1 (US One over CN Two), and 2 are not separated"
@@ -1719,4 +1797,26 @@ def test_readme_open_weight_table_carries_the_lab_origin(monkeypatch):
     assert re.search(r"\*\*CN One\*\*.*\| China \|", md)
     assert "the Chinese model is decisively ahead in 1" in md
     assert "| Lab origin | Open-weight | Closed |" in md
-    assert "| China | 2 · top score CN One, 91.0 [87.0–95.0] | none |" in md
+    # Intervals are bound against GitHub wrapping them mid-range.
+    wj = "⁠"
+    assert f"| China | 2 · top score CN One, 91.0 [87.0{wj}–{wj}95.0] | none |" in md
+    assert re.search(r"\*\*CN One\*\*.*\| \*\*91\.0\*\* \[87\.0⁠–⁠95\.0\] \|", md)
+
+
+def test_prices_print_whole_dollars_or_cents():
+    """"$0.1 / $0.5" sat beside the README's "$0.10/$0.50": a fractional price
+    prints to the cent, a whole one stays bare, and a finer price is kept."""
+    assert lb._fmt_price(4) == "$4" and lb._fmt_price(1.25) == "$1.25"
+    assert lb._fmt_price(0.1) == "$0.10" and lb._fmt_price(1.4) == "$1.40"
+    assert lb._fmt_price(0.025) == "$0.025"
+    assert lb._fmt_price(None) == lb.PRICE_MISSING
+
+
+def test_byline_never_breaks_a_date():
+    """At 390 px the byline wrapped "updated 2026-" / "11-09"; each date is
+    kept whole."""
+    ledger = {"runs": [_fake_run("2026-07-10", "ab" * 32,
+                                 [_fake_model("a", "A", "openai", 90.0)])]}
+    by = lb.render_html(ledger).split('<p class="by">')[1].split("</p>")[0]
+    assert '<span class="nw">2026-07-10</span>' in by
+    assert ".nw{white-space:nowrap}" in lb.CSS
