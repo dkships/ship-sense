@@ -442,6 +442,28 @@ def build_snapshot(run_id: str, per_model: dict[str, list[dict]],
     }
 
 
+def declared_provisional(run_id: str) -> dict[str, dict]:
+    """{model: {"reason": ...}} from the run's policy.json "provisional" key: models
+    whose answers stayed missing after the last output-cap step (METHODOLOGY: an
+    incomplete run stays visible as a provisional estimate)."""
+    path = ROOT / "outputs" / run_id / "policy.json"
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text()).get("provisional") or {}
+
+
+def mark_provisional(snapshot: dict, provisional: dict[str, dict]) -> None:
+    """Carry each declared reason onto its row. A declared model that the coverage
+    rule would rank is an error: a declaration never changes how a row is ranked."""
+    for m in snapshot["models"]:
+        entry = provisional.get(m["name"])
+        if not entry:
+            continue
+        if m.get("ranked_eligible", True):
+            raise ValueError(f"{m['name']} is declared provisional but has full coverage")
+        m["provisional_reason"] = entry["reason"]
+
+
 def _adversarial_floor(case_scope: str) -> list[dict] | None:
     """Floor rows from the gameability policies (src.adversarial), or None
     when that module is not part of this checkout. Each row carries label,
@@ -577,6 +599,20 @@ def rank_with_ties(models: list[dict]) -> list[dict]:
 
 def _eligible_rows(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("ranked_eligible", True) and r.get("pos") is not None]
+
+
+def _provisional_rows(rows: list[dict]) -> list[dict]:
+    """Current rows shown but not ranked (incomplete answers or coverage)."""
+    return [r for r in rows if not r.get("is_baseline") and not r.get("ranked_eligible", True)]
+
+
+def _current_count(ranked: int, provisional: int) -> str:
+    """'24 current AI models (23 ranked, 1 provisional)'; '23 current AI models' when
+    no current row is provisional (FIX-LIST A5: one lineup wording everywhere)."""
+    if not provisional:
+        return f"{ranked} current AI models"
+    return (f"{ranked + provisional} current AI models ({ranked} ranked, "
+            f"{provisional} provisional)")
 
 
 # --------------------------------------------------------------------------- #
@@ -1340,6 +1376,9 @@ def _coverage(r: dict, bank_n: int) -> str:
     if n is None or bank_n is None:
         return ""
     if not r.get("ranked_eligible", True):
+        if r.get("provisional_reason"):
+            return (f'<span class="cov">Provisional, not ranked. '
+                    f'{escape(r["provisional_reason"])}</span>')
         if r.get("missing_dimensions"):
             why = "missing dimension"
         elif r.get("check_coverage_ratio") not in (None, 1.0):
@@ -1732,6 +1771,20 @@ tr.provisional td{background:rgba(26,29,35,.03)}
 tr.section td{color:var(--ink);font-weight:600;font-size:.875rem;padding:16px 12px 8px}
 tr.section .note{font-weight:400;color:var(--muted);margin-left:.5rem}
 tr.section+tr td{border-top:0}
+/* ---- preview tracks (beside the board, never ranked) ---- */
+.ptrack{margin:40px 0 0}
+.ptrack h3 .meta{display:block;font:400 .875rem/1.45 var(--sans);color:var(--muted);margin-top:4px}
+.ptask{color:var(--text);max-width:40em;margin:0 0 8px}
+.pfinding{color:var(--ink);font-weight:500;max-width:40em;margin:0 0 16px}
+table.ptable{min-width:600px}
+td.pextra{color:var(--text);white-space:nowrap}
+.pfinding{font-weight:600}
+.pcaveat{color:var(--text);max-width:40em;margin:0 0 16px}
+table.ptable caption{caption-side:top;text-align:left;font:400 .75rem/1.4 var(--sans);
+color:var(--muted);padding:0 0 6px}
+tr.pbase td{border-top:1px solid var(--ink);color:var(--muted);font:500 .75rem/1.3 var(--sans);
+padding-top:14px;padding-bottom:6px}
+#previews tr.baseline .num.big{font-weight:400;color:var(--muted)}
 
 /* ---- generation matchup cards: hairline-topped, no boxes ---- */
 .gcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 32px;margin:0 0 24px}
@@ -1928,6 +1981,13 @@ table:not(.hist):not(.matrix) .model .provider{white-space:normal}
 .model .tver{display:block}
 .model .tsep{display:none}
 table:not(.hist):not(.matrix) .score{min-width:4.6rem}
+/* Preview tables keep model, score and the verdict column on a phone. */
+#previews table.ptable{min-width:0}
+#previews table.ptable th:nth-child(3),#previews table.ptable td:nth-child(3){display:table-cell}
+#previews td.pextra{white-space:normal}
+/* The section links scroll sideways on a phone: fade the cut edge so it reads as more. */
+.jump{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);
+mask-image:linear-gradient(to right,#000 82%,transparent)}
 table:not(.hist):not(.matrix) td.rrange{white-space:nowrap}
 .field.fwide{display:none}
 .field.fnarrow{display:block}
@@ -3448,7 +3508,7 @@ _PROG_ROLE_NOTE = ("lab-colored marks set a new best on their panel; gray marks 
 # no code: the chart's one-line takeaway (placeholder until the copy pass) and
 # the unit its vertical scale is read in.
 PROGRESS_TAKEAWAY = ("Among models still callable, the best score by release date rose from 52.8 "
-                     "(GPT-4o mini, July 2024) to 96.6 (Claude Fable 5.2, November 2026). Before "
+                     "(GPT-4o mini, July 2024) to 96.8 (Claude Fable 5.2, November 2026). Before "
                      "late September 2025 every plotted model is OpenAI's, and a running best rises "
                      "and flattens on its own, so the shape shows neither a speed-up nor a "
                      "slowdown.")
@@ -4099,15 +4159,22 @@ def _share_description(run: dict, ranked: list[dict]) -> str:
         result = f"{top['label']} has the top score, {top['score']['value']:.1f}"
         first = _sole_first(ranked)
         if first:
-            result = _first_line(first, n_models)
+            result = _ranked_wording(_first_line(first, n_models), ranked)
         elif len(contenders) > 1:
             result = (f"{len(contenders)} of {n_models} models could rank #1; "
                       f"{top['label']} has the top point score, {top['score']['value']:.1f}")
     else:
         result = "No ranked models"
     total = sum(not m.get("is_baseline") for m in run.get("models", [])) or n_models
-    scope = (f"{total} models ({n_models} current, {total - n_models} earlier releases)"
-             if total > n_models else f"{n_models} models")
+    k = len(_provisional_rows(ranked))
+    current = (f"{n_models + k} current ({n_models} ranked, {k} provisional)" if k
+               else f"{n_models} current")
+    if total > n_models + k:
+        scope = f"{total} models: {current} and {total - n_models - k} earlier releases"
+    elif k:
+        scope = f"{total} models: {current}"
+    else:
+        scope = f"{n_models} models"
     return (f"{result}. {scope} scored on {bank_n} real product "
             f"decisions (Restraint, Honesty, Conviction); run {date}.")
 
@@ -4177,11 +4244,17 @@ HERO_DEFAULTS = " at each vendor’s default settings"
 # What the current version changed, under the hero. Version copy, like
 # PROGRESS_TAKEAWAY: the fall range is checked against the ledger by a test.
 VERSION_CHANGE_NOTE = (
-    "<b>What changed in v4.7.</b> Honesty no longer counts false alarms (unsupported "
-    "claims a model asserts). On November 9 I found the rule that graded them wrong more "
-    "often than right, in an audit whose labels came from Claude Fable 5.2, the model "
-    "ranked first here. Every current model’s score fell, by 0.4 to 5.7 points, and "
-    "scores compare only within a version. Details in "
+    "<b>What changed in v4.8.</b> I decided three Restraint keys: one call now accepts "
+    "a second answer at normal weight, two calls on one case are no longer graded "
+    "because the brief cannot settle them, and one stays as keyed. The regrade called "
+    "no model. Every ranked current model’s score rose, by 0.04 to 0.22 points, most "
+    "at the top, and no rank changed. Nearly all of that comes from the excluded pair, "
+    "which a screen for checks the best models fail found. Claude Fable 5.2, the lead "
+    "agent and the model ranked first, ran that screen and proposed the decisions, and "
+    "I approved them. The registration says so. Two preview tracks "
+    "are shown beside the score, outside it, and neither can yet separate the current "
+    "models. Gemini 4 Carbon is shown but not ranked: two of its answers never came "
+    "back. Scores compare only within a version. Details in "
     f'<a href="{REPO_URL}/blob/main/CORRECTIONS.md">CORRECTIONS</a> and '
     f'<a href="{REPO_URL}/blob/main/RELEASES.md">RELEASES</a>.')
 
@@ -4232,6 +4305,375 @@ def _decisive_tally(records: list[dict]) -> tuple[bool, Counter]:
     return exploratory, Counter(r[field] for r in records if r.get(field))
 
 
+# --------------------------------------------------------------------------- #
+# Preview tracks (NEXT_VERSION section 10): rendered from previews.json only,
+# beside the board and never inside it. No file, no section.
+#
+#   previews.json ──_previews_section──> <section id="previews"> (page)
+#                 ──render_previews_md──> README previews block
+# --------------------------------------------------------------------------- #
+PREVIEWS_FILE = ROOT / "previews.json"
+README_PREVIEWS_START = "<!-- previews:generated:start -->"
+README_PREVIEWS_END = "<!-- previews:generated:end -->"
+CLAIMCHECK, FORECAST = "claimcheck", "forecast"
+PREVIEW_LABELS = (("SUPPORTED", "supported"), ("CONTRADICTED", "contradicted"),
+                  ("CANNOT_TELL", "cannot tell"))
+PREVIEW_POLICY_NAMES = {"always_SUPPORTED": "Always “supported”",
+                        "always_CONTRADICTED": "Always “contradicted”",
+                        "always_CANNOT_TELL": "Always “cannot tell”",
+                        "tone_policy": "Label by tone alone"}
+PREVIEW_BASELINE_NAMES = (("plan", "The plan itself"),
+                          ("haircut", "Half the plan (fixed haircut)"),
+                          ("hindsight", "Best constant in hindsight"))
+# Beside a preview-lineup model whose headline row is provisional.
+PREVIEW_PROVISIONAL_NOTE = "headline row provisional"
+PREVIEW_PROVISIONAL_MD = "_(headline row provisional)_"
+# Claim check reads as at its ceiling when at least this share of the scored
+# current models sit at or above the ceiling score.
+PREVIEW_CEILING_SHARE = 0.5
+# Fixed strings for the preview tables (placeholders in voice; the writer reviews them).
+PREVIEW_TABLE_CAPTION = "In Ship Sense Score order. Not a ranking."
+PREVIEW_BASELINES_LABEL = "Baselines, not models"
+PREVIEW_FORECAST_CAVEAT = (
+    "Most plans here are targets, not forecasts, so beating a plan is not the same as "
+    "out-forecasting the people who wrote it. Each brief was also written after its "
+    "result was known, and the controls that would tell real forecasting from hindsight "
+    "have not been run.")
+PREVIEW_LINEUP_NOTE = (
+    "Each table covers all {n} current models, including {who}, whose Ship Sense row is "
+    "provisional. Its track answers are complete. Agreement with the Ship Sense Score "
+    "order uses the {ranked} ranked models.")
+PREVIEW_BELOW_CEILING = "below {x:.2f}"
+PREVIEW_NOT_BEATING = "does not beat the constant"
+PREVIEW_UNREADABLE = "{k} unreadable answers, counted and not scored"
+PREVIEW_REL_CASES = ", on the {n} cases every model has a readable answer for"
+PREVIEW_LEDE = (
+    "Two new tasks, reported beside the board while they are tested. They are "
+    "previews: neither enters the Ship Sense Score, and no model is ranked on them. "
+    "Both were registered, with their scoring rules and baselines, before any model "
+    "answered a case.")
+
+
+def load_previews(path: Path | None = None) -> dict | None:
+    path = Path(path or PREVIEWS_FILE)
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def _registration_url(data: dict) -> str:
+    return f'{REPO_URL}/blob/main/{data["registration"]["file"]}'
+
+
+def _pv_ci(ci, digits: int) -> str:
+    return f"{ci[0]:.{digits}f}&#8288;&ndash;&#8288;{ci[1]:.{digits}f}"
+
+
+def _pv_ci_md(ci, digits: int) -> str:
+    return f"{ci[0]:.{digits}f}–{ci[1]:.{digits}f}"
+
+
+def _pv_digits(track: dict) -> int:
+    return 2 if track["higher_is_better"] else 3
+
+
+def _pv_ordered(track: dict, data: dict) -> list[tuple[dict, dict]]:
+    """(lineup entry, model result) in Ship Sense Score order (the board's order, a
+    provisional row last), never by track score: the tables are not rankings."""
+    return [(m, track["models"][m["name"]]) for m in data["lineup"]
+            if m["name"] in track["models"]]
+
+
+def _pv_set_text(name: str, track: dict) -> str:
+    s = track["set"]
+    if name == CLAIMCHECK:
+        return (f'{s["cases"]} cases from {s["organisations"]} organisations · '
+                f'{s["claims"]} claims')
+    return (f'{s["cases"]} cases from {s["organisations"]} organisations · '
+            f'{s["questions"]} questions · {s["results_above_plan"]} results beat their plan · '
+            'lower is better')
+
+
+def _pv_cluster(track: dict, labels: dict[str, str]) -> tuple[list[str], list[str]]:
+    """(models whose interval overlaps the median model's, the others): the group the
+    track cannot order, and any named exception."""
+    scored = sorted(track["models"].items(), key=lambda kv: kv[1]["score"])
+    _, mid = scored[len(scored) // 2]
+    inside, outside = [], []
+    for n, r in scored:
+        overlaps = r["ci95"][0] <= mid["ci95"][1] and r["ci95"][1] >= mid["ci95"][0]
+        (inside if overlaps else outside).append(n)
+    return inside, outside
+
+
+def _pv_spread(name: str, track: dict, labels: dict[str, str]) -> str:
+    """Forecast: how tightly the models sit, so a reader does not order them."""
+    if name != FORECAST:
+        return ""
+    inside, outside = _pv_cluster(track, labels)
+    vals = [track["models"][n]["score"] for n in inside]
+    count = (f'All {len(inside)}' if len(inside) == len(track["models"])
+             else f'{len(inside)} of {len(track["models"])}')
+    line = (f'{count} current models score between '
+            f'{min(vals):.3f} and {max(vals):.3f}, with overlapping intervals, so the track '
+            'cannot order them.')
+    if outside:
+        who = ", ".join(f'{labels.get(n, n)} ({track["models"][n]["score"]:.3f})'
+                        for n in outside)
+        line += f" Outside that group: {who}."
+    return line
+
+
+def _pv_finding(name: str, track: dict) -> str:
+    """The track's plain finding, from the data: the ceiling for Claim check, the
+    paired comparison with the hindsight constant for Forecast."""
+    c = track["ceiling"]
+    n = c["models_scored"]
+    if name == CLAIMCHECK:
+        k = c["models_at_or_above"]
+        line = (f'{k} of {n} current models score {c["at_or_above"]:.2f} or higher, '
+                f'and the highest score is {c["best"]:.2f}.')
+        if n and k / n >= PREVIEW_CEILING_SHARE:
+            line += (" The track is at its ceiling for most of the lineup, so it "
+                     "cannot separate them.")
+        return line
+    base = track["floor"]["hindsight"]
+    return (f'Paired on the same resampled cases, {c["models_beating_hindsight_paired"]} of '
+            f'{n} current models beat the best constant in hindsight (a forecast of '
+            f'{base["multiplier"]:.2f} × the plan, which no forecaster could know) with the '
+            'whole 95% interval of the paired difference.')
+
+
+def _pv_extra(name: str, result: dict) -> str:
+    if name == CLAIMCHECK:
+        acc = result["accuracy_by_true_label"]
+        return " · ".join(f'{acc[key]:.2f}' if acc[key] is not None else "&mdash;"
+                          for key, _ in PREVIEW_LABELS)
+    miss, cover = result["typical_miss_factor"], result["coverage_80"]
+    miss_text = f"×{miss:.2f}" if miss is not None else "&mdash;"
+    cover_text = f"{cover:.0%}" if cover is not None else "&mdash;"
+    return f"{miss_text} · {cover_text}"
+
+
+def _pv_head(name: str) -> str:
+    if name == CLAIMCHECK:
+        return ("<th>Model</th><th>Accuracy (95%&nbsp;CI)</th>"
+                "<th>By true label: supported · contradicted · cannot&nbsp;tell</th>")
+    return ("<th>Model</th><th>Interval score (95%&nbsp;CI)</th>"
+            "<th>Typical miss · 80% coverage</th>")
+
+
+def _pv_row_notes(name: str, track: dict, result: dict) -> list[str]:
+    """The exceptions to the finding line, on their own rows."""
+    notes = []
+    if name == CLAIMCHECK and result["score"] < track["ceiling"]["at_or_above"]:
+        notes.append(PREVIEW_BELOW_CEILING.format(x=track["ceiling"]["at_or_above"]))
+    if name == FORECAST and not result["beats_hindsight"]:
+        notes.append(PREVIEW_NOT_BEATING)
+    if result["ungraded_generations"]:
+        notes.append(PREVIEW_UNREADABLE.format(k=result["ungraded_generations"]))
+    return notes
+
+
+def _pv_model_row(name: str, track: dict, entry: dict, result: dict,
+                  amap: dict[str, str]) -> str:
+    digits = 2 if name == CLAIMCHECK else 3
+    notes = "".join(f'<span class="cov">{escape(n)}</span>'
+                    for n in _pv_row_notes(name, track, result))
+    return (f'<tr><td class="model"><span class="dot" style="background:'
+            f'{_provider_color(entry.get("provider"))}"></span><span class="mname">'
+            f'<span class="label">{escape(entry["label"])}'
+            f'{_avail_html(amap.get(entry["name"]))}</span><span class="provider">'
+            f'{escape(_provider_name(entry.get("provider")))}{_avail_sub(amap.get(entry["name"]))}'
+            f'{_pv_provisional(entry)}</span>{notes}</span></td>'
+            f'<td class="score"><span class="num big">{result["score"]:.{digits}f}</span>'
+            f'<span class="ciq">95% CI {_pv_ci(result["ci95"], digits)}</span></td>'
+            f'<td class="pextra">{_pv_extra(name, result)}</td></tr>')
+
+
+def _pv_provisional(entry: dict) -> str:
+    """Beside a model whose Ship Sense row is provisional (shown, not ranked)."""
+    return f" &middot; {PREVIEW_PROVISIONAL_NOTE}" if entry.get("headline_provisional") else ""
+
+
+def _pv_floor_rows(name: str, track: dict) -> str:
+    """The floor beside the models, under its own rule and label: content-free
+    policies (Claim check) or the three baselines on the same scale (Forecast)."""
+    out = (f'<tr class="pbase"><td colspan="3">{escape(PREVIEW_BASELINES_LABEL)}</td></tr>')
+    if name == CLAIMCHECK:
+        items = [(PREVIEW_POLICY_NAMES.get(g["check"], g["check"]), g["value"], "content-free policy")
+                 for g in track["floor"]["gates"]]
+        digits = 2
+    else:
+        items = [(label, track["floor"][key]["mean_wis"], "baseline")
+                 for key, label in PREVIEW_BASELINE_NAMES]
+        digits = 3
+    for label, value, kind in items:
+        out += (f'<tr class="baseline"><td class="model"><span class="dot" '
+                f'style="background:var(--muted)"></span><span class="mname"><span '
+                f'class="label">{escape(label)}</span><span class="provider">{kind}'
+                f'</span></span></td>'
+                f'<td class="score"><span class="num big">{value:.{digits}f}</span></td>'
+                f'<td class="pextra">&mdash;</td></tr>')
+    return out
+
+
+def _pv_stats_note(name: str, track: dict, labels: dict[str, str]) -> str:
+    rel, agree = track["reliability"], track["headline_agreement"]
+    parts = []
+    if name == FORECAST:
+        parts.append("The interval score is the weighted interval score of a median and "
+                     "one 80% interval on a log scale (0 is a perfect point forecast). "
+                     "Typical miss is the median factor between forecast and result.")
+    if rel.get("split_half") is not None:
+        parts.append(f'Split-half reliability of the model order: {rel["split_half"]:.2f} '
+                     f'(95% of splits {rel["range95"][0]:.2f} to {rel["range95"][1]:.2f})'
+                     f'{_pv_rel_cases(track)}. The bar to leave preview is 0.70.')
+    if agree.get("spearman") is not None:
+        parts.append(f'Agreement with the Ship Sense Score order (Spearman, over the '
+                     f'{agree["models"]} ranked current models): '
+                     f'{agree["spearman"]:.2f}, 95% CI {_pv_ci(agree["ci95"], 2)}.')
+    ungraded = sum(r["ungraded_generations"] for r in track["models"].values())
+    truncated = sum(r["truncated_generations"] for r in track["models"].values())
+    parts.append(f'Two answers per case. Across all models, {ungraded} answers were unreadable '
+                 f'and {truncated} were cut off (an unreadable answer is counted, not scored).')
+    dates = track["answer_dates"]
+    if dates.get("first"):
+        span = dates["first"] if dates["first"] == dates["last"] else f'{dates["first"]} to {dates["last"]}'
+        parts.append(f"Answers collected {span}.")
+    if track["pending_models"]:
+        who = ", ".join(escape(labels.get(n, n)) for n in track["pending_models"])
+        parts.append(f"<b>Not yet complete:</b> {who}.")
+    return " ".join(parts)
+
+
+def _pv_rel_cases(track: dict) -> str:
+    """The reliability split uses only cases every model has a readable answer for;
+    say so when that is fewer than the set."""
+    n = track["reliability"].get("cases")
+    if n is None or n >= track["set"]["cases"]:
+        return ""
+    return PREVIEW_REL_CASES.format(n=n)
+
+
+def _pv_rel_md(track: dict) -> str:
+    rel = track["reliability"]
+    if rel.get("split_half") is None:
+        return ""
+    return (f' Split-half reliability of the model order {rel["split_half"]:.2f}'
+            f'{_pv_rel_cases(track)} (the bar to leave preview is 0.70).')
+
+
+def _pv_track_block(name: str, track: dict, data: dict) -> str:
+    labels = {m["name"]: m["label"] for m in data["lineup"]}
+    amap = availability()
+    rows = "".join(_pv_model_row(name, track, entry, result, amap)
+                   for entry, result in _pv_ordered(track, data))
+    rows += _pv_floor_rows(name, track)
+    spread = _pv_spread(name, track, labels)
+    spread_html = f'<p class="pfinding">{escape(spread)}</p>' if spread else ""
+    caveat = (f'<p class="pcaveat">{escape(PREVIEW_FORECAST_CAVEAT)}</p>'
+              if name == FORECAST else "")
+    return f"""<div class="ptrack" id="preview-{name}">
+<h3>{escape(track["title"])} <span class="meta">{escape(_pv_set_text(name, track))}</span></h3>
+<p class="ptask">{escape(track["task"])}</p>
+<p class="pfinding">{escape(_pv_finding(name, track))}</p>
+{spread_html}{caveat}
+<div class="tablewrap" tabindex="0" role="region" aria-label="{escape(track["title"])} results"><table class="ptable">
+<caption>{escape(PREVIEW_TABLE_CAPTION)}</caption>
+<thead><tr>{_pv_head(name)}</tr></thead>
+<tbody>{rows}</tbody>
+</table></div>
+<p class="note">{_pv_stats_note(name, track, labels)}</p>
+</div>"""
+
+
+def _pv_lineup_note(data: dict) -> str:
+    """Once, in the section intro: who the tables cover, and who the agreement uses."""
+    provisional = [m["label"] for m in data["lineup"] if m.get("headline_provisional")]
+    if not provisional:
+        return ""
+    n = len(data["lineup"])
+    return PREVIEW_LINEUP_NOTE.format(n=n, who=", ".join(provisional), ranked=n - len(provisional))
+
+
+def _previews_section(data: dict | None) -> str:
+    if not data:
+        return ""
+    blocks = "\n".join(_pv_track_block(name, data["tracks"][name], data)
+                       for name in (CLAIMCHECK, FORECAST) if name in data["tracks"])
+    partial = (" <b>This build is partial:</b> some current models are not complete yet."
+               if data.get("partial") else "")
+    lineup = _pv_lineup_note(data)
+    lineup = f" {escape(lineup)}" if lineup else ""
+    return f"""<section id="previews">
+<h2>Preview tracks <span class="meta">{escape(data["version"])} &middot; not in the Ship Sense Score</span></h2>
+<p class="lead-in">{escape(PREVIEW_LEDE)}{lineup} Registration: <a href="{_registration_url(data)}">{escape(data["registration"]["file"])}</a>, section {escape(data["registration"]["section"])}.{partial}</p>
+{blocks}
+</section>"""
+
+
+def render_previews_md(data: dict | None) -> str:
+    """The README's compact previews block: one line per track, one table."""
+    if not data:
+        return ""
+    tracks = data["tracks"]
+    cc, fc = tracks.get(CLAIMCHECK), tracks.get(FORECAST)
+    labels = {m["name"]: m["label"] for m in data["lineup"]}
+    lineup = _pv_lineup_note(data)
+    lines = ["### Preview tracks (not in the Ship Sense Score)", "",
+             f'{PREVIEW_LEDE}{" " + lineup if lineup else ""} Registration: '
+             f'[{data["registration"]["file"]}]({data["registration"]["file"]}), section '
+             f'{data["registration"]["section"]}.', ""]
+    if data.get("partial"):
+        lines += ["**This build is partial:** some current models are not complete yet.", ""]
+    if cc:
+        floor = ", ".join(f'{PREVIEW_POLICY_NAMES.get(g["check"], g["check"]).lower()} '
+                          f'{g["value"]:.2f}' for g in cc["floor"]["gates"])
+        lines.append(f'- **Claim check** ({_pv_set_text(CLAIMCHECK, cc)}): {cc["task"]} '
+                     f'Accuracy, higher is better. Floor: {floor}. '
+                     f'**{_pv_finding(CLAIMCHECK, cc)}**{_pv_rel_md(cc)}')
+    if fc:
+        base = ", ".join(f'{label.lower()} {fc["floor"][key]["mean_wis"]:.3f}'
+                         for key, label in PREVIEW_BASELINE_NAMES)
+        lines.append(f'- **Forecast** ({_pv_set_text(FORECAST, fc)}): {fc["task"]} '
+                     f'Interval score, lower is better. Baselines: {base}. '
+                     f'**{_pv_finding(FORECAST, fc)} {_pv_spread(FORECAST, fc, labels)}** '
+                     f'{PREVIEW_FORECAST_CAVEAT}{_pv_rel_md(fc)}')
+    lines += ["", f"_{PREVIEW_TABLE_CAPTION}_", "",
+              "| Model | Claim check (95% CI) | Forecast, lower is better (95% CI) |",
+              "|---|---|---|"]
+    for m in data["lineup"]:
+        cells = []
+        for name, track in ((CLAIMCHECK, cc), (FORECAST, fc)):
+            result = (track or {}).get("models", {}).get(m["name"])
+            if result is None:
+                cells.append("pending")
+                continue
+            digits = _pv_digits(track)
+            notes = _pv_row_notes(name, track, result)
+            note = f' _({"; ".join(notes)})_' if notes else ""
+            cells.append(f'{result["score"]:.{digits}f} ({_pv_ci_md(result["ci95"], digits)}){note}')
+        note = f" {PREVIEW_PROVISIONAL_MD}" if m.get("headline_provisional") else ""
+        lines.append(f'| {m["label"]}{_avail_md(availability().get(m["name"]))}{note} '
+                     f'| {cells[0]} | {cells[1]} |')
+    return "\n".join(lines)
+
+
+def inject_previews_readme(data: dict | None, path: Path = None) -> bool:
+    """Replace the README's previews block (own markers). No-op without markers."""
+    path = Path(path or README)
+    if not path.exists():
+        return False
+    text = path.read_text()
+    if README_PREVIEWS_START not in text or README_PREVIEWS_END not in text:
+        return False
+    head, _, rest = text.partition(README_PREVIEWS_START)
+    _, _, tail = rest.partition(README_PREVIEWS_END)
+    body = render_previews_md(data)
+    path.write_text(f"{head}{README_PREVIEWS_START}\n{body}\n{README_PREVIEWS_END}{tail}"
+                    if body else f"{head}{README_PREVIEWS_START}\n{README_PREVIEWS_END}{tail}")
+    return True
+
+
 def render_html(ledger: dict) -> str:
     """One self-contained HTML string for the latest run in the ledger."""
     runs = ledger.get("runs", [])
@@ -4244,14 +4686,17 @@ def render_html(ledger: dict) -> str:
     b = run["bank"]
 
     bank_n = b.get("n_items")
-    n_models = sum(1 for m in current if not m["is_baseline"])
+    # A count says exactly what it counts: ranked current models, then any
+    # provisional current rows in plain words.
+    n_models = len(eligible)
+    n_provisional = len(_provisional_rows(ranked))
     partial = [r for r in ranked if not r.get("ranked_eligible", True)]
     amap = availability()
     rows = "".join(_model_row(r, bank_n, amap) for r in eligible)
     if partial:
         rows += _section_row(
             "Provisional estimates",
-            f"not ranked: below {int(RANKED_COVERAGE_MIN * 100)}% coverage or missing a dimension",
+            f"not ranked: missing answers, below {int(RANKED_COVERAGE_MIN * 100)}% coverage or missing a dimension",
         )
         rows += "".join(_model_row(r, bank_n, amap) for r in partial)
     if adversarial:
@@ -4284,11 +4729,12 @@ def render_html(ledger: dict) -> str:
                           f'end ({who}).')
     coverage_note = ""
     if partial:
-        who = ", ".join(f'{escape(r["label"])} ({r["n_items"]}/{bank_n})' for r in partial)
-        coverage_note = (f' Provisional rows: {who} did not meet the '
-                         f'{int(RANKED_COVERAGE_MIN * 100)}% coverage/all-dimensions '
-                         "eligibility gate. Missing items are left ungraded, not counted "
-                         "wrong. These coverage-limited estimates can differ from complete scores in either direction.")
+        who = ", ".join(escape(r["label"]) for r in partial)
+        coverage_note = (f' <b>Provisional</b> rows ({who}) are shown but not ranked: some '
+                         "answers are missing, so they have no rank range and are left out "
+                         "of the paired tests. Missing answers are left ungraded, not counted "
+                         "wrong or right, so these estimates can differ from complete scores "
+                         "in either direction.")
 
     pairwise_section = ""
     if pairwise:
@@ -4315,11 +4761,14 @@ significant: its cell shows which way it leans, and a lean does not mean the two
 
     weights_section = _weights_section(ranked, pairwise)
     progress_section = _progress_section(runs, models, previous)
+    previews_section = _previews_section(load_previews())
     # The result first: the board, then progress over time, then what we measure.
     jump_links = ['<a href="#leaderboard">Leaderboard</a>']
     if progress_section:
         jump_links.append('<a href="#progress">Progress</a>')
     jump_links.append('<a href="#measure">What we measure</a>')
+    if previews_section:
+        jump_links.append('<a href="#previews">Preview tracks</a>')
     if gen_pairs:
         jump_links.append('<a href="#generations">Generations</a>')
     # Caveats before the specialist views that depend on them.
@@ -4364,7 +4813,7 @@ significant: its cell shows which way it leans, and a lean does not mean the two
 <div class="herolead">
 <p class="kicker">{escape(HERO_KICKER)}</p>
 <h1>{escape(_hero_line(ranked))}</h1>
-<p class="deck">Ship Sense scores {n_models} current AI models, and earlier releases back to 2024,
+<p class="deck">Ship Sense scores {_current_count(n_models, n_provisional)}, and earlier releases back to 2024,
 on product judgment: what <b>not</b> to build, what the data can't support, and when to hold a
 call or change it. The cases are real product decisions, every score comes with a 95% interval
 (its margin of error), and no lab's reviewer grades its own models.</p>
@@ -4416,6 +4865,8 @@ documented answer, and each targets a known weakness in AI models.</p>
 <p class="formula">The <b>Ship Sense Score</b> (0&ndash;100) is the plain average of the three
 skill scores, so a skill with more cases can't dominate. It is reported with a 95% interval.</p>
 </section>
+
+{previews_section}
 
 {_generations_section(gen_pairs, bank_n, ranked)}
 
@@ -4614,6 +5065,18 @@ def _first_line(first: tuple[dict, list[dict]], n_models: int) -> str:
     return CARD_FIRST_LINE.format(name=first[0]["label"], m=n_models)
 
 
+# With a provisional current row on the board, a count of ranked models says so, so
+# the headline never contradicts "24 current (23 ranked, 1 provisional)" below it.
+CURRENT_MODELS = "current models"
+RANKED_CURRENT_MODELS = "ranked current models"
+
+
+def _ranked_wording(line: str, ranked: list[dict]) -> str:
+    if not _provisional_rows(ranked):
+        return line
+    return line.replace(CURRENT_MODELS, RANKED_CURRENT_MODELS)
+
+
 def _card_top_group(ranked: list[dict]) -> tuple[list[dict], str]:
     """(models to list, the line above them). The top group is every model
     whose rank range includes #1, the board's own rank sets from its paired
@@ -4626,10 +5089,10 @@ def _card_top_group(ranked: list[dict]) -> tuple[list[dict], str]:
         return eligible[:1], CARD_NO_RANKS_LINE
     first = _sole_first(ranked)
     if first:
-        return [first[0]], _first_line(first, len(eligible))
+        return [first[0]], _ranked_wording(_first_line(first, len(eligible)), ranked)
     if len(group) == 1:
-        return group, CARD_SOLE_LINE.format(m=len(eligible))
-    return group, CARD_TIE_LINE.format(n=len(group), m=len(eligible))
+        return group, _ranked_wording(CARD_SOLE_LINE.format(m=len(eligible)), ranked)
+    return group, _ranked_wording(CARD_TIE_LINE.format(n=len(group), m=len(eligible)), ranked)
 
 
 @dataclass(frozen=True)
@@ -5122,6 +5585,8 @@ def _board_md_row(r: dict, rank: str, cols: _BoardColumns, bank_n: int | None,
     rank_cell = (_md_unbroken(f"{_rank_range(r)} · {_p_first_text(r)}") if eligible
                  else "—")
     cells = [rank, f"**{r['label']}**{_avail_md(amap.get(r['name']))}"]
+    if not eligible and r.get("provisional_reason"):
+        cells[1] += f"<br>_Provisional, not ranked. {r['provisional_reason']}_"
     if cols.tested_on:
         cells.append(r.get("bench_version") or "—")
     cells += [_md_unbroken(f"**{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}]"), rank_cell]
@@ -5164,8 +5629,8 @@ def render_markdown(ledger: dict) -> str:
     for r in eligible:
         lines.append(_board_md_row(r, f"{r['pos']}", cols, bank_n, amap))
     if partial:
-        lines.append(_md_cells(["—", "_Provisional estimates (not ranked: incomplete item/check "
-                                "coverage or a missing dimension)_"]
+        lines.append(_md_cells(["—", "_Provisional estimates (not ranked: missing answers, "
+                                "incomplete item/check coverage or a missing dimension)_"]
                                + ["—"] * (len(_board_md_head(cols)[1].split("|")) - 4)))
     for r in partial:
         lines.append(_board_md_row(r, "prov.", cols, bank_n, amap))
@@ -5182,7 +5647,8 @@ def render_markdown(ledger: dict) -> str:
     if pairwise:
         exploratory, decisive = _decisive_tally(pairwise)
         best = decisive.most_common(1)[0][1] if decisive else 0
-        n_models = sum(1 for m in run["models"] if not m["is_baseline"])
+        # The models in the paired tests: a provisional row is not among them.
+        n_models = len({name for r in pairwise for name in (r["a"], r["b"])})
         family = (" (current and previous generations)" if previous else "")
         correction = ("at an exploratory Benjamini–Hochberg q ≤ 0.05" if exploratory
                       else "after Holm correction")
@@ -5305,6 +5771,7 @@ def write_pages(ledger: dict) -> None:
     elif (DOCS / "progression.svg").exists():
         (DOCS / "progression.svg").unlink()  # nothing to plot -> no stale chart
     inject_readme(ledger)
+    inject_previews_readme(load_previews())
 
 
 # --------------------------------------------------------------------------- #
@@ -5344,10 +5811,22 @@ def main():
     from . import complete
     errors = (complete.completeness_errors(args.run_id, list(per_model), args.case_scope)
               + complete.publication_errors(args.run_id))
+    # A model the run declares provisional (answers missing after the last output-cap
+    # step) is published only as an unranked provisional row; its own completeness
+    # errors are expected and printed, never waived for a ranked row.
+    provisional = declared_provisional(args.run_id)
+    expected = [e for e in errors if e.split(":", 1)[0] in provisional]
+    errors = [e for e in errors if e not in expected]
     if errors:
         ap.error("publication checks failed:\n  - " + "\n  - ".join(errors))
+    for line in expected:
+        print(f"provisional (not ranked): {line}")
     meta = loader.model_meta()
     snapshot = build_snapshot(args.run_id, per_model, meta, case_scope=args.case_scope)
+    try:
+        mark_provisional(snapshot, provisional)
+    except ValueError as e:
+        ap.error(str(e))
     ledger = load_ledger(Path(args.ledger))
     new_hash = _comparison_hash(snapshot["bank"])
     new_ranked = {m["name"] for m in snapshot["models"] if not m["is_baseline"]}

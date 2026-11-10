@@ -861,8 +861,11 @@ models:
     price_out: 10                # not on the free tier
     api: generate_content
     structured_outputs: true     # JSON response schema accepted 2026-11-10 (facts_probe.out)
-    max_tokens: 32768            # sizing probe 2026-11-10 (glm-5.3's 5 longest cases: no predecessor): peak
-                                 # 22,565 tokens, 69% of 32,768 (above 70% of 8,192); cap bounds thinking + answer
+    max_tokens: 65536            # rule 4 raise 2026-11-10 18:3x UTC, mid-run: 6 Restraint generations cut off
+                                 # unreadable at 32,768 (all thinking) and 4 same-cap re-runs cut off again;
+                                 # the 4 run again once at 65,536 (docs maximum output; models.get says
+                                 # 32,768). Was 32,768 from the sizing probe (glm-5.3's 5 longest cases, no
+                                 # predecessor): peak 22,565, 69%. notes/carbon-2026-11-10/cap_events.json
     batch_supported: true        # probed against Google's Batch API 2026-11-10, not the docs
     batch_discount: 0.5          # (notes/carbon-2026-11-10/batch_probe.out; gemini-4-argon control)
     price_verified: "2026-11-10"
@@ -1113,6 +1116,11 @@ models:
                                  # 4.3 control ACCEPTED). Re-probed 2026-10-24: ACCEPTED, as the docs' "20% off".
     price_verified: "2026-11-09"
     price_source: "https://docs.x.ai/developers/pricing"
+    timeout_s: 600               # transport only, added 2026-11-10 during the v4.8 preview run: 8 of the
+                                 # first 10 Forecast generations hit the 120 s client default while the
+                                 # model was still thinking (the 2 that finished wrote 2,686 and 5,853
+                                 # output tokens). Nothing sent to the model changes. Same setting other
+                                 # long-thinking models already carry.
   - name: grok-4.6
     provider: xai
     id: grok-4.6

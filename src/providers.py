@@ -203,6 +203,8 @@ def estimate_cost_usd(cfg: dict[str, Any], usage: dict,
 
 
 PANEL_REVIEW_SHAPE = "panel_review"
+PREVIEW_CLAIMCHECK_SHAPE = "claimcheck"
+PREVIEW_FORECAST_SHAPE = "forecast"
 
 
 def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
@@ -248,6 +250,42 @@ def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
             "required": list(item["problems"]),
             "additionalProperties": False,
         }
+    if shape == PREVIEW_CLAIMCHECK_SHAPE and item and item.get("claims"):
+        # Preview track (v4.8): one label and one reason per displayed claim id.
+        ids = [claim["id"] for claim in item["claims"]]
+        per_claim = {
+            "type": "object",
+            "properties": {cid: {"type": "string"} for cid in ids},
+            "required": ids,
+            "additionalProperties": False,
+        }
+        return {
+            "type": "object",
+            "properties": {"labels": per_claim, "reasons": per_claim},
+            "required": ["labels", "reasons"],
+            "additionalProperties": False,
+        }
+    if shape == PREVIEW_FORECAST_SHAPE and item and item.get("questions"):
+        # Preview track (v4.8): a median and an 80% interval per question id.
+        ids = [question["id"] for question in item["questions"]]
+        bounds = ["low", "median", "high"]
+        forecast = {
+            "type": "object",
+            "properties": {name: {"type": "number"} for name in bounds},
+            "required": bounds,
+            "additionalProperties": False,
+        }
+        return {
+            "type": "object",
+            "properties": {"forecasts": {
+                "type": "object",
+                "properties": {qid: forecast for qid in ids},
+                "required": ids,
+                "additionalProperties": False,
+            }},
+            "required": ["forecasts"],
+            "additionalProperties": False,
+        }
     if shape == "restraint" and item and item.get("features"):
         props = {f["id"]: {"type": "string"} for f in item["features"]}
         return {
@@ -291,6 +329,8 @@ def _typed_from_json_schema(spec: dict, types) -> Any:
         return S(type=T.ARRAY, items=_typed_from_json_schema(spec["items"], types))
     if t == "string":
         return S(type=T.STRING)
+    if t == "number":
+        return S(type=T.NUMBER)
     raise ValueError(f"unsupported schema type for Gemini conversion: {t!r}")
 
 
@@ -318,7 +358,29 @@ class MockProvider(Provider):
             return self._honesty(item)
         if t == "conviction":
             return self._conviction(item, turn)
+        if t == PREVIEW_CLAIMCHECK_SHAPE:
+            return self._claimcheck(item)
+        if t == PREVIEW_FORECAST_SHAPE:
+            return self._forecast(item)
         return json.dumps({"note": f"mock: unhandled type {t}"})
+
+    def _claimcheck(self, item) -> str:
+        """Preview track: one fixed label per variant (content-free; it only
+        exercises the harness). The naive mock answers in prose, so the
+        ungraded-generation path runs end to end."""
+        if self.variant == "naive":
+            return "I cannot label these claims."
+        label = "SUPPORTED" if self.variant == "strong" else "CANNOT_TELL"
+        ids = [claim["id"] for claim in item["claims"]]
+        return json.dumps({"labels": {cid: label for cid in ids},
+                           "reasons": {cid: "mock" for cid in ids}})
+
+    def _forecast(self, item) -> str:
+        """Preview track: a fixed forecast per variant; the weak mock's interval
+        is inverted, so the invalid-forecast rule runs end to end."""
+        low, median, high = (50, 100, 200) if self.variant == "strong" else (300, 100, 50)
+        forecast = {"low": low, "median": median, "high": high}
+        return json.dumps({"forecasts": {q["id"]: dict(forecast) for q in item["questions"]}})
 
     def _restraint(self, item) -> str:
         cls, reasons = {}, {}

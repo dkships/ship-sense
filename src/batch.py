@@ -415,7 +415,7 @@ def prepare(model_names: list[str], run_id: str, *,
         gens = generations or defaults.get("generations", 1)
         # Same precedence as the live path (run.py): explicit override, then the
         # model's registry ceiling, then the global default.
-        token_cap = max_tokens or int(cfg.get("max_tokens", defaults.get("max_tokens", 2048)))
+        token_cap = run.output_cap(cfg, defaults, max_tokens)
         rows: list[dict] = []
         records: list[dict] = []
         seen_ids: set[str] = set()

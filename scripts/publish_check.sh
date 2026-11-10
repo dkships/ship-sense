@@ -15,10 +15,11 @@ bad() { say "FAIL  $*"; fail=1; }
 ok()  { say "ok    $*"; }
 
 # 1. Private paths must be gitignored and untracked.
-for p in cases/private_x keys/x reviews/x notes/x outputs/x retired/x .env CLAUDE.md; do
+for p in cases/private_x keys/x previews/claimcheck/x previews/forecast/x reviews/x notes/x outputs/x retired/x .env CLAUDE.md; do
   git check-ignore -q "$p" 2>/dev/null && ok "ignored: ${p%x}*" || bad "NOT ignored: $p"
 done
 tracked_private=$(git ls-files | grep -E '^(reviews|notes|outputs)/|^\.env$|^CLAUDE\.md$' || true)
+tracked_private="$tracked_private$(git ls-files previews | grep -Ev '^previews/[^/]+/example_[^/]*\.yaml$' || true)"
 [ -z "$tracked_private" ] && ok "no private paths tracked" || bad "tracked private paths: $tracked_private"
 
 # 2. No private item id — or id prefix (the client-name token before the first
@@ -26,7 +27,7 @@ tracked_private=$(git ls-files | grep -E '^(reviews|notes|outputs)/|^\.env$|^CLA
 #    runtime from the local private bank (never embedded here). Keys and retired
 #    items are scanned too, so an orphan or retired id still contributes its tokens.
 ids=$(
-  for p in cases/*/*.yaml keys/*.yaml retired/*/*.yaml; do
+  for p in cases/*/*.yaml keys/*.yaml retired/*/*.yaml previews/*/*.yaml; do
     [ -e "$p" ] || continue
     basename "$p" .yaml
   done | { grep -v '^example_' || true; } | sort -u
@@ -34,7 +35,8 @@ ids=$(
 # A prefix is scanned because it is normally a client-name token. A generic
 # English prefix is not one, and matches public field names ("support_flags"),
 # so it is dropped here; the full ids that carry it are still scanned above.
-generic_prefixes='^support_$'
+# Preview ids start with a track tag (cc_, fc_), not a client token.
+generic_prefixes='^(support|cc|fc)_$'
 prefixes=$(printf '%s\n' $ids | sed 's/_.*/_/' | sort -u | { grep -Ev "$generic_prefixes" || true; })
 leak=""
 for tok in $ids $prefixes; do
@@ -42,6 +44,11 @@ for tok in $ids $prefixes; do
   [ -n "$hits" ] && leak="$leak $tok($hits)"
 done
 [ -z "$leak" ] && ok "no private item ids or prefixes in tracked files" || bad "private ids leaked:$leak"
+
+# 2b. No real preview claim or question text, and no brief opening, in any tracked
+#     file (previews.json and the page are built from the aggregate only).
+"$PY" -m src.preview_publish --scan-tracked >/dev/null 2>&1 \
+  && ok "no preview case text in tracked files" || bad "preview case text in tracked files (run: $PY -m src.preview_publish --scan-tracked)"
 
 # 3. Tests green (includes the docs/README/card drift guards + privacy guard).
 "$PY" -m pytest -q >/dev/null 2>&1 && ok "test suite passes" || bad "test suite fails"

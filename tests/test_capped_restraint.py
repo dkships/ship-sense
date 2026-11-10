@@ -66,7 +66,12 @@ def test_every_restraint_case_feature_ids_match_key_labels():
             continue
         feat_ids = {f["id"] for f in item.get("features", [])}
         label_ids = set(item["_key"].get("labels", {}))
-        excluded = item["_key"].get("excluded_checks", {})
+        excluded = dict(item["_key"].get("excluded_checks", {}))
+        # v4.8 (NEXT_VERSION 10h): calls excluded at a version keep their labels and
+        # notes under one block with a single reason; the feature stays model-visible.
+        block = item["_key"].get("excluded_v4_8")
+        if block:
+            excluded.update({fid: block.get("reason") for fid in block.get("labels", {})})
         assert all(reason for reason in excluded.values())
         assert not label_ids & set(excluded)
         assert feat_ids == label_ids | set(excluded), (
