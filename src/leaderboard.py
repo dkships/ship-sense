@@ -3419,7 +3419,7 @@ _PROG_ROLE_NOTE = ("lab-colored marks set a new best on their panel; gray marks 
 # no code: the chart's one-line takeaway (placeholder until the copy pass) and
 # the unit its vertical scale is read in.
 PROGRESS_TAKEAWAY = ("Among models still callable, the best score by release date rose from 61.8 "
-                     "(GPT-4o mini, July 2024) to 94.4 (Claude Opus 5.5, September 2026). Before "
+                     "(GPT-4o mini, July 2024) to 97.0 (Claude Fable 5.2, November 2026). Before "
                      "late September 2025 every plotted model is OpenAI's, and a running best rises "
                      "and flattens on its own, so the shape shows neither a speed-up nor a "
                      "slowdown.")

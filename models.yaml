@@ -1196,6 +1196,8 @@ models:
   # the same rule as every US lab: one model per tier of the current API lineup.
   # Different lines, so Wonder does NOT retire Spark (no succession, no pair).
   # (Until 2026-10-12 this header read "Like xAI, Meta ships ONE frontier model".)
+  # UPDATED 2026-11-09: THREE tiers. Muse Ember 1.0 (the efficient tier, $0.10/$0.50)
+  # joins Wonder and Spark on pay-as-you-go API; see its entry.
   # Contributor-mode ids (muse-spark-1.x-contributor) are the SAME checkpoints on
   # a train-on-your-data tier and are deliberately not in this registry — see the
   # note above the 1.2 entry. Muse Wonder Full is not here either: see the Wonder
@@ -1412,6 +1414,46 @@ models:
     # answer (reasoning inside completion_tokens, like Spark), and the 5 longest-
     # answered bank items used 3,442-9,568 output tokens, so 8,192 would truncate.
     max_tokens: 32768            # cap bounds reasoning+answer; worst measured 9,568
+    timeout_s: 900
+    price_verified: "2026-11-09"
+    price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
+
+  # Muse Ember 1.0 — announced and added 2026-11-09 (research.meta.ai/blog/muse-ember,
+  # dated November 9, 2026: "available today on Muse Code and Meta Model API as
+  # muse-ember-1.0"). Meta's third tier: the models page calls it "the efficient
+  # execution model in the Muse family, built for high-volume, repeated work", taking
+  # "the same requests as Muse Spark at a lower price per token". Pay-as-you-go,
+  # Standard mode only (no Contributor variant), no preview/beta label on any of the
+  # five first-party pages, weights not released (API-hosted). So Meta's ladder is now
+  # Wonder / Spark / Ember, one model per tier like every US lab; a new line, so it
+  # retires nothing and has no succession pair.
+  # Reasoning effort minimal..max, DEFAULT "max" (dev.meta.ai/docs/muse-ember); we omit
+  # it. Context 1,048,576, max output 524,288. Usage shape probed 2026-11-09
+  # (notes/ember-2026-11-09/facts_probe.out): reasoning INSIDE completion_tokens (1,316
+  # of 1,336 on a one-line prompt), total == prompt + completion, like Spark/Wonder.
+  # LAUNCH CLAIM registered in hypotheses.yaml v4.6 before any bank item (two pairs from
+  # one sentence: vs Claude Haiku 5.5 and vs GPT-6 Luna). The dev-blog line "outperforms
+  # similar-class models on AutomationBench-AA and Terminal-Bench 4.0" is tied to two
+  # benchmarks and names no model; the Spark 1.3 comparison is table-only. No pair for
+  # either (Fable 5.2 and Wonder precedents).
+  # LABEL "Muse Ember 1.0" parses to ("muse ember", (1, 0)), its own line.
+  - name: muse-ember-1.0
+    provider: meta
+    id: muse-ember-1.0
+    base_url: https://api.meta.ai/v1
+    label: "Muse Ember 1.0"
+    released: "2026-11-09"       # research.meta.ai/blog/muse-ember, dated November 9, 2026
+    price_in: 0.1                # TIERED by the request's input tokens, cached included: $0.10/$0.50
+    price_out: 0.5               # (cached $0.004) up to 200K, $0.30/$1.50 (cached $0.012) above,
+    price_cached_in: 0.004       # billed in full. Every Ship Sense prompt is far below 200K, so the
+                                 # lower tier is the price this bank pays (Haiku 5.5 precedent).
+                                 # Meta caches automatically; prompt_tokens INCLUDES cached.
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true     # strict json_schema accepted 2026-11-09 (facts_probe.out)
+    max_tokens: 32768            # sizing probe 2026-11-09 (glm-5.3's 5 longest cases: no predecessor): peak
+                                 # 18,388 tokens, 56% of 32,768 (above 70% of 8,192); cap bounds reasoning + answer
+    batch_supported: false       # 2026-11-09 notes/batch_probe.py: "batch API not enabled" (Spark 1.3 same)
     timeout_s: 900
     price_verified: "2026-11-09"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
