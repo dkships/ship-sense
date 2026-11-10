@@ -396,3 +396,19 @@ def test_labels_name_steps_worth_naming_newest_first():
     assert [p.name for p in full] == ["d", "a", "b"]          # c gained 0.3
     brief = lb._label_order(steps, pg.Metric.SCORE, lb._PanelDetail.BRIEF)
     assert [p.name for p in brief] == ["d", "a"]
+
+
+def test_takeaway_quotes_the_committed_best_to_date():
+    """PROGRESS_TAKEAWAY is hand copy, so it must name the committed board's
+    first and latest best-to-date points (it read 94.4 for Claude Opus 5.5
+    after Claude Fable 5.2 had scored 97.0)."""
+    runs = lb.load_ledger()["runs"]
+    run = runs[-1]
+    _, previous = lb.split_generations(run["models"])
+    points, _ = lb._progress_data(runs, run["models"], previous)
+    steps = pg.frontier(points, pg.Metric.SCORE)
+
+    for point in (steps[0], steps[-1]):
+        score = 100 * point.value(pg.Metric.SCORE)
+        quoted = f"{score:.1f} ({point.label}, {point.released:%B %Y})"
+        assert quoted in lb.PROGRESS_TAKEAWAY
