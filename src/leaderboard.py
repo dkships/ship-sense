@@ -1281,8 +1281,13 @@ PRICE_UNKNOWN = "?"
 
 
 def _fmt_price(x, missing: str = PRICE_MISSING) -> str:
-    """USD per 1M tokens as "$4" or "$1.25"; `missing` when the price is absent."""
-    return f"${x:g}" if x is not None else missing
+    """USD per 1M tokens as "$4", "$1.25" or "$0.10" (cents, never "$0.1"); a
+    finer price keeps its digits; `missing` when the price is absent."""
+    if x is None:
+        return missing
+    if x == int(x) or round(x, 2) != x:
+        return f"${x:g}"
+    return f"${x:.2f}"
 
 
 def _price_slash(price_in, price_out) -> str:
@@ -1356,7 +1361,11 @@ def _with_versions(models: list[dict], run: dict) -> list[dict]:
 
 def _version_tag(r: dict) -> str:
     v = r.get("bench_version")
-    return f' &middot; tested on {escape(v)}' if v else ""
+    if not v:
+        return ""
+    # Its own span, so a phone gives it a whole line instead of orphaning "v4.6".
+    return (f'<span class="tver"><span class="tsep"> &middot; </span>'
+            f'tested on {escape(v)}</span>')
 
 
 def _rank_cell(r: dict) -> str:
@@ -1416,7 +1425,7 @@ def floor_rows(rows: list[dict]) -> str:
                 f'<td class="rank">&mdash;</td>'
                 f'<td class="model"><span class="dot" style="background:var(--muted)"></span>'
                 f'<span class="mname"><span class="label">{escape(f["label"])}</span>'
-                f'<span class="provider">gameability floor &middot; not ranked</span></span></td>'
+                f'<span class="provider">gameability floor &middot; not&nbsp;ranked</span></span></td>'
                 f'<td class="rel">&mdash;</td>'
                 f'<td class="cost">&mdash;</td>'
                 f'<td class="score"><span class="num big">{f["headline"]:.1f}</span></td>'
@@ -1436,7 +1445,7 @@ def _baseline_row(m: dict) -> str:
             f'<td class="rank">&mdash;</td>'
             f'<td class="model"><span class="dot" style="background:var(--muted)"></span>'
             f'<span class="mname"><span class="label">{escape(m["label"])}</span>'
-            f'<span class="provider">gameability floor &middot; not ranked</span></span></td>'
+            f'<span class="provider">gameability floor &middot; not&nbsp;ranked</span></span></td>'
             f'<td class="rel">&mdash;</td>'
             f'<td class="cost">&mdash;</td>'
             f'<td class="score"><span class="num big">{sc["value"]:.1f}</span></td>'
@@ -1634,6 +1643,7 @@ letter-spacing:-.012em;color:var(--ink);margin:0;text-wrap:balance}
 .deck{font-size:1.125rem;line-height:1.6;color:var(--text);max-width:36em;margin:20px 0 0;
 text-wrap:pretty}
 .by{font-size:.875rem;line-height:1.45;color:var(--muted);margin:16px 0 0}
+.nw{white-space:nowrap}
 .heromini{margin:0}
 .heromini svg{display:block;width:100%;height:auto}
 
@@ -1643,7 +1653,7 @@ h2{font:500 1.875rem/1.2 var(--serif);color:var(--ink);margin:0 0 24px}
 h2 .meta{display:block;font:400 .875rem/1.45 var(--sans);color:var(--muted);margin-top:6px}
 h3{font:500 1.375rem/1.3 var(--sans);color:var(--ink);margin:0 0 8px}
 .lead-in{color:var(--text);max-width:36em;margin:0 0 24px;text-wrap:pretty}
-.note{font-size:.875rem;line-height:1.55;color:var(--muted);margin:16px 0 0;max-width:52em;
+.note{font-size:.875rem;line-height:1.55;color:var(--muted);margin:16px 0 0;max-width:46em;
 text-wrap:pretty}
 .note b{color:var(--text)}
 .wlede{color:var(--text);max-width:36em;margin:0 0 24px;text-wrap:pretty}
@@ -1678,7 +1688,7 @@ color:var(--muted);margin:0 0 16px}
 .field .frow:hover line{opacity:.9}
 .field.fnarrow{display:none}
 """ + _CHART_TEXT_CSS + """
-.fcap{font:400 .75rem/1.5 var(--sans);color:var(--muted);margin:8px 0 0;max-width:60em}
+.fcap{font:400 .75rem/1.5 var(--sans);color:var(--muted);margin:8px 0 0;max-width:54em}
 
 /* ---- tables ---- */
 .tablewrap{overflow-x:auto}
@@ -1694,12 +1704,15 @@ tbody tr:hover{background:rgba(26,29,35,.025)}
 .rank{width:2.6rem;color:var(--muted);text-align:right;padding-right:14px}
 td.rrange{white-space:nowrap}
 .model{min-width:13.5rem}
+/* Top-aligned with the name block and centred on its first line's x-height
+   (16px/1.4 here, 14px/1.4 on a phone), not on the cell's baseline. */
 .model .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.6rem;
-vertical-align:.05em}
+vertical-align:top;margin-top:7.5px}
 /* Cap the name block so it always fits beside the lab dot. */
 .model .mname{display:inline-block;vertical-align:top;max-width:calc(100% - 1.5rem)}
 .model .label{font-weight:600;display:block;font-size:1rem;color:var(--ink)}
 .model .provider{color:var(--muted);font-size:.75rem;white-space:nowrap}
+.model .tver{white-space:nowrap}
 .avail{font-style:italic;font-weight:400;color:var(--muted)}
 abbr.avail{margin-left:.3rem;font-size:.875rem;text-decoration:underline dotted var(--quiet);
 text-underline-offset:.2em;cursor:help;white-space:nowrap}
@@ -1821,14 +1834,14 @@ font:600 .875rem/1 var(--sans);color:var(--ink);text-align:center;padding:0 .5re
 table.matrix th.mwins{font:500 .75rem/1 var(--sans);color:var(--muted)}
 
 /* ---- callout, limits, history ---- */
-.choose{margin:24px 0 0;max-width:44em;color:var(--text);text-wrap:pretty}
+.choose{margin:24px 0 0;max-width:36em;color:var(--text);text-wrap:pretty}
 .choose .label{font-weight:600;color:var(--ink);margin-right:.35em}
-.panel{max-width:48em}
+.panel{max-width:36em}
 .panel ul{margin:0;padding:0;list-style:none}
 .panel li{padding:16px 0;border-top:1px solid var(--rule);font-size:1rem;line-height:1.6;
 text-wrap:pretty}
 .panel li:last-child{border-bottom:1px solid var(--rule)}
-td.vnote{color:var(--text);line-height:1.45;min-width:19rem;max-width:26rem}
+td.vnote{color:var(--text);line-height:1.45;min-width:19rem;max-width:30rem}
 .hist td{vertical-align:top}
 .hist td:nth-child(2){white-space:nowrap}
 .hist td:nth-child(4){min-width:11rem}
@@ -1886,7 +1899,7 @@ section{padding-top:64px}
 .jump{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0 18px;
 margin-right:-16px;padding-right:16px}
 .jump::-webkit-scrollbar{display:none}
-.jump a{white-space:nowrap;padding:14px 0}
+.jump a{white-space:nowrap;padding:15px 0}
 .masthead{flex-direction:column;align-items:stretch;flex-wrap:nowrap}
 .mark{padding:12px 0 0}
 h2{font-size:1.5rem}
@@ -1908,10 +1921,12 @@ table:not(.hist):not(.matrix) .rank{width:1.7rem;padding-right:6px}
 table:not(.hist):not(.matrix) thead th{white-space:normal}
 table:not(.hist):not(.matrix) .model{min-width:10rem}
 table:not(.hist):not(.matrix) .model .label{white-space:normal;font-size:.875rem}
-table:not(.hist):not(.matrix) .model .dot{margin-right:.4rem}
+table:not(.hist):not(.matrix) .model .dot{margin-right:.4rem;margin-top:6px}
 .model abbr.avail{display:none}
 .model .avail-sub{display:inline}
 table:not(.hist):not(.matrix) .model .provider{white-space:normal}
+.model .tver{display:block}
+.model .tsep{display:none}
 table:not(.hist):not(.matrix) .score{min-width:4.6rem}
 table:not(.hist):not(.matrix) td.rrange{white-space:nowrap}
 .field.fwide{display:none}
@@ -1960,6 +1975,7 @@ CSS += """
 .prog .prow:hover line{opacity:.95}
 .prog.pnarrow{display:none}
 .pkey{margin:16px 0 0}
+.fieldwrap>.pkey:first-child{margin:0 0 16px}
 .pkey svg{width:14px;height:14px;flex:none}
 .ptake{font:500 1.375rem/1.35 var(--sans);color:var(--ink);max-width:36em;margin:0 0 8px;
 text-wrap:pretty}
@@ -2387,10 +2403,11 @@ def _field_geom(layout: _FieldLayout, labels: list[str], column: _ExtraColumn) -
     names = min(_FIELD_NARROW_LABEL_MAX, max(_FIELD_NARROW_LABEL_MIN, longest))
     # With a second number column (rank in group), the score moves left so a
     # two-digit range ("10-19") never runs into it: score ends at 304, the
-    # range starts at about 312. The column head goes up to the unit line,
-    # clear of the tick row.
+    # range starts at about 312. The plot stops at 250 so a ▲ past an interval
+    # that reaches the top of the axis still clears the score. The column head
+    # goes up to the unit line, clear of the tick row.
     return _FieldGeom(vw=360, label_x=2, plot_left=names + 12,
-                      plot_right=262 if extra else 312, score_x=304 if extra else 356,
+                      plot_right=250 if extra else 312, score_x=304 if extra else 356,
                       extra_x=356 if extra else None, row_h=30, mark_r=4.5,
                       top=44, tick_step=_FIELD_NARROW_TICK_STEP, head_y=14)
 
@@ -2741,7 +2758,7 @@ def _origin_html(split: dict) -> str:
     for o in split["origins"]:
         g = split["groups"][o]
         items = "".join(
-            f"<li>{kind}: {_origin_cell(g[key], escape, '&middot;', '&ndash;')}</li>"
+            f"<li>{kind}: {_origin_cell(g[key], escape, '&middot;', '&#8288;&ndash;&#8288;')}</li>"
             for kind, key in (("Open-weight", "open"), ("Closed", "closed")))
         cards.append(f'<div class="ocard"><h4>{escape(o)}</h4><ul>{items}</ul></div>')
     pairs = _origin_pairs_text(split, escape, "&le;")
@@ -3275,7 +3292,7 @@ good at, so each comparison is also broken out by skill.</p>
 <div class="tablewrap"><table>
 <thead><tr>
 <th>#</th><th>Model</th><th>Released</th><th title="USD per 1M tokens">$/M in/out</th>
-<th>Ship Sense Score (95% CI)</th>
+<th>Ship Sense Score (95%&nbsp;CI)</th>
 <th>Restraint</th><th>Honesty</th><th>Conviction</th>
 </tr></thead>
 {rows}
@@ -3401,7 +3418,7 @@ _PROG_TAKE_PX, _PROG_TAKE_LEAD = 15, 20
 _PROG_TAKE_EM = 0.52
 _PROG_LEGEND_ROW = 22
 _PROG_LEGEND_PX = 13
-_PROG_LEGEND_TEXT_EM = 0.54
+_PROG_LEGEND_TEXT_EM = 0.48  # system sans measured ~0.45 em; Segoe UI runs wider
 _PROG_LEGEND_GLYPH_W = 18    # glyph box plus its gap to the words
 _PROG_LEGEND_ITEM_GAP = 18
 # models.yaml: the date a provider shut a model's API down. A model scored on
@@ -4278,12 +4295,15 @@ significant: its cell shows which way it leans, and a lean does not mean the two
     jump_nav = f'<nav class="jump" aria-label="Sections">{"".join(jump_links)}</nav>'
 
     run_date = escape(_run_date_text(run))
+    # Each ISO date stays whole: a phone broke "2026-" / "11-09" at its hyphen.
+    by_date = re.sub(r"\d{4}-\d{2}-\d{2}", lambda m: f'<span class="nw">{m[0]}</span>',
+                     run_date)
     bank_digest, bank_hash_label = _display_hash(b)
     bank_hash = escape(bank_digest)
     bank_label = escape(_bank_label(b))
     byline = HERO_BYLINE.format(
         author='<a href="https://dmkthinks.org/">David Kelly</a>',
-        version=escape(run.get("version") or ""), date=run_date,
+        version=escape(run.get("version") or ""), date=by_date,
         bank=escape(CARD_BANK_NOTE.format(n=bank_n)) if bank_n else "")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -4326,7 +4346,7 @@ call or change it. The cases are real product decisions, every score comes with 
 <div class="tablewrap" tabindex="0" role="region" aria-label="Leaderboard table"><table>
 <thead><tr>
 <th>#</th><th>Model</th><th>Released</th><th title="USD per 1M tokens">$/M in/out</th>
-<th>Ship Sense Score (95% CI)</th>
+<th>Ship Sense Score (95%&nbsp;CI)</th>
 <th title="95% rank confidence set from the paired tests">Rank range</th>
 <th>Restraint</th><th>Honesty</th><th>Conviction</th>
 </tr></thead>
@@ -4467,7 +4487,8 @@ _CARD_SERIF_EM = 0.48
 # Left column: the top group as interval rows on one scale, on the band.
 _CARD_LEFT_END = 664                        # scores right-align here
 _CARD_ROWS_TOP = 206                        # band top
-_CARD_ROW_PITCH = 30
+_CARD_ROW_PITCH = 30                        # a full group's pitch, at least
+_CARD_ROW_PITCH_MAX = 52                    # a short group's pitch, at most
 _CARD_ROWS_END = 500                        # band bottom, at most
 _CARD_BAND_PAD = 12
 _CARD_BAND_BLEED = 20                       # band reaches past the text column
@@ -4478,6 +4499,12 @@ _CARD_MARK_R = 7.5
 _CARD_CI_W = 5
 _CARD_SCALE_STEP = 5                        # score points between ticks
 _CARD_FOOT_Y = 600
+# A group this short fills the column down to the chart's plot bottom, in the
+# card's next type steps up with marks to match; rows that would sit more than
+# _CARD_ROW_PITCH_TALL apart are centred on the band instead.
+_CARD_SHORT_GROUP = 5
+_CARD_ROW_PITCH_TALL = 96
+_CARD_TALL_MARK_R, _CARD_TALL_CI_W = 10.0, 7.0
 
 # Right column: the chart, no panel box (the page's convention).
 _CARD_CHART_X = 736
@@ -4566,37 +4593,69 @@ class _CardScale:
         return self.left + (v - self.lo) / (self.hi - self.lo) * (self.right - self.left)
 
 
-def _card_scale(shown: list[dict]) -> _CardScale:
+@dataclass(frozen=True)
+class _CardRowStyle:
+    """Type and mark sizes for the top group's rows."""
+    name_px: float
+    score_px: float
+    mark_r: float
+    ci_w: float
+
+
+def _card_row_style(short: bool) -> _CardRowStyle:
+    """A full group at the card's smallest type; a short one a step up (names
+    at the chart title's 24, scores at the title's 26), marks in proportion."""
+    if not short:
+        return _CardRowStyle(CARD_MIN_FONT_PX, CARD_MIN_FONT_PX, _CARD_MARK_R, _CARD_CI_W)
+    return _CardRowStyle(_CARD_CHART_TITLE_PX, _CARD_TITLE_PX, _CARD_TALL_MARK_R,
+                         _CARD_TALL_CI_W)
+
+
+def _card_scale(shown: list[dict], name_px: float) -> _CardScale:
     """One point of air around every interval shown, after a name column as
     wide as the longest name needs."""
     lo = math.floor(min(r["score"]["lo"] for r in shown)) - 1
     hi = math.ceil(max(r["score"]["hi"] for r in shown)) + 1
     amap = availability()
     names = [f'{r["label"]} {amap.get(r["name"]) or ""}'.strip() for r in shown]
-    widest = max(_card_width(n, CARD_MIN_FONT_PX) for n in names)
+    widest = max(_card_width(n, name_px) for n in names)
     left = min(_CARD_PLOT_MAX_X, max(_CARD_PLOT_MIN_X, _CARD_PAD + widest + 16))
     return _CardScale(lo, hi, left, _CARD_PLOT_END)
 
 
-def _card_row(r: dict, cy: float, scale: _CardScale, amap: dict[str, str]) -> str:
+def _card_row(r: dict, cy: float, scale: _CardScale, amap: dict[str, str],
+              st: _CardRowStyle) -> str:
     """Name (with any pre-release tag), the 95% interval as a bar on the shared
     scale with the lab's mark at the score, and the score. The exact interval
     is the row's tooltip."""
     s = r["score"]
-    base = cy + CARD_MIN_FONT_PX * _CARD_MIDLINE
     color = _provider_color(r.get("provider"))
     return (f'<g><title>{escape(r["label"])} {s["value"]:.1f} '
             f'[{s["lo"]:.1f}–{s["hi"]:.1f}]</title>'
-            + _card_text(_CARD_PAD, base, r["label"], CARD_MIN_FONT_PX, _CARD_INK, 500,
-                         tail=_card_avail(amap.get(r["name"])))
+            + _card_text(_CARD_PAD, cy + st.name_px * _CARD_MIDLINE, r["label"], st.name_px,
+                         _CARD_INK, 500, tail=_card_avail(amap.get(r["name"])))
             + f'<line x1="{scale.x(s["lo"]):.1f}" y1="{cy:.1f}" x2="{scale.x(s["hi"]):.1f}" '
-              f'y2="{cy:.1f}" stroke="{color}" stroke-width="{_CARD_CI_W}" '
+              f'y2="{cy:.1f}" stroke="{color}" stroke-width="{st.ci_w:g}" '
               f'stroke-linecap="round" stroke-opacity=".55"/>'
             + _literal_tokens(_svg_mark(r.get("provider"), scale.x(s["value"]), cy,
-                                        _CARD_MARK_R, ring=_CARD_BAND))
-            + _card_text(_CARD_LEFT_END, base, f'{s["value"]:.1f}', CARD_MIN_FONT_PX,
-                         _CARD_INK, 600, _TextAnchor.END)
+                                        st.mark_r, ring=_CARD_BAND))
+            + _card_text(_CARD_LEFT_END, cy + st.score_px * _CARD_MIDLINE, f'{s["value"]:.1f}',
+                         st.score_px, _CARD_INK, 600, _TextAnchor.END)
             + '</g>')
+
+
+def _card_band_geom(lines: int, short: bool) -> tuple[float, float, float]:
+    """(row pitch, band bottom, tick baseline). A short group fills the column
+    to the chart's plot bottom with its ticks on the chart's date baseline, so
+    both columns end together; a longer one packs from the top as before."""
+    if short:
+        room = _CARD_PLOT_BOTTOM - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD
+        pitch = min(_CARD_ROW_PITCH_TALL, room / lines)
+        return pitch, _CARD_PLOT_BOTTOM, _CARD_PLOT_BOTTOM + _CARD_DATE_GAP
+    room = _CARD_ROWS_END - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD
+    pitch = max(_CARD_ROW_PITCH, min(_CARD_ROW_PITCH_MAX, room // lines))
+    band_bottom = _CARD_ROWS_TOP + 2 * _CARD_BAND_PAD + lines * pitch
+    return pitch, band_bottom, band_bottom + _CARD_TICK_GAP
 
 
 def _card_rows(group: list[dict]) -> str:
@@ -4608,8 +4667,10 @@ def _card_rows(group: list[dict]) -> str:
     fits = int((_CARD_ROWS_END - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD) // _CARD_ROW_PITCH)
     shown = group if len(group) <= fits else group[:fits - 1]
     lines = len(shown) + (len(shown) < len(group))
-    band_bottom = _CARD_ROWS_TOP + 2 * _CARD_BAND_PAD + lines * _CARD_ROW_PITCH
-    scale = _card_scale(shown)
+    short = len(group) <= _CARD_SHORT_GROUP
+    pitch, band_bottom, tick_y = _card_band_geom(lines, short)
+    st = _card_row_style(short)
+    scale = _card_scale(shown, st.name_px)
 
     out = (f'<rect x="{_CARD_PAD - _CARD_BAND_BLEED}" y="{_CARD_ROWS_TOP}" '
            f'width="{_CARD_LEFT_END - _CARD_PAD + 2 * _CARD_BAND_BLEED}" '
@@ -4619,17 +4680,19 @@ def _card_rows(group: list[dict]) -> str:
         x = scale.x(t)
         out += (f'<line x1="{x:.1f}" y1="{_CARD_ROWS_TOP}" x2="{x:.1f}" y2="{band_bottom}" '
                 f'stroke="{_CARD_RULE}" stroke-width="1.5"/>'
-                + _card_text(x, band_bottom + _CARD_TICK_GAP, str(t), CARD_MIN_FONT_PX,
+                + _card_text(x, tick_y, str(t), CARD_MIN_FONT_PX,
                              _CARD_MUTED_INK, anchor=_TextAnchor.MIDDLE))
 
     amap = availability()
-    top = _CARD_ROWS_TOP + _CARD_BAND_PAD + _CARD_ROW_PITCH / 2
-    out += "".join(_card_row(r, top + i * _CARD_ROW_PITCH, scale, amap)
+    # Rows held to the tall pitch sit centred on the band.
+    slack = band_bottom - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD - lines * pitch
+    top = _CARD_ROWS_TOP + _CARD_BAND_PAD + slack / 2 + pitch / 2
+    out += "".join(_card_row(r, top + i * pitch, scale, amap, st)
                    for i, r in enumerate(shown))
     if len(shown) == len(group):
         return out
     more = CARD_MORE_LINE.format(k=len(group) - len(shown))
-    y = top + len(shown) * _CARD_ROW_PITCH + CARD_MIN_FONT_PX * _CARD_MIDLINE
+    y = top + len(shown) * pitch + CARD_MIN_FONT_PX * _CARD_MIDLINE
     return out + _card_text(_CARD_PAD, y, more, CARD_MIN_FONT_PX, _CARD_MUTED_INK, 600)
 
 
@@ -4888,9 +4951,10 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
     for r in open_rows:
         s = r["score"]
         due = " <i>weights due</i>" if wmap.get(r["name"]) == WEIGHTS_PENDING else ""
+        score = _md_unbroken(f"**{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}]")
         lines.append(f"| {r['pos']} | **{r['label']}**{_avail_md(amap.get(r['name']))}{due} "
                      f"| {_origin_of(r) or '—'} "
-                     f"| **{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}] "
+                     f"| {score} "
                      f"| {_rank_range(r)} | {_price_md(r)} | {lic.get(r['name'], '—')} |")
     # Define the tag only while some row carries it.
     any_due = any(wmap.get(r["name"]) == WEIGHTS_PENDING for r in open_rows)
@@ -4908,8 +4972,9 @@ def _weights_markdown(ranked: list[dict], records: list[dict] | None) -> list[st
               "| Lab origin | Open-weight | Closed |", "|---|---|---|"]
     for o in split["origins"]:
         g = split["groups"][o]
-        lines.append(f"| {o} | {_origin_cell(g['open'], _as_is, '·', '–')} "
-                     f"| {_origin_cell(g['closed'], _as_is, '·', '–')} |")
+        dash = f"{_WORD_JOINER}–{_WORD_JOINER}"
+        lines.append(f"| {o} | {_origin_cell(g['open'], _as_is, '·', dash)} "
+                     f"| {_origin_cell(g['closed'], _as_is, '·', dash)} |")
     pairs = _origin_pairs_text(split, _as_is, "≤")
     if pairs:
         lines += ["", pairs]
