@@ -1,0 +1,365 @@
+{
+ "step1": {
+  "guard": 64000000,
+  "pairs": 2145,
+  "widths": {
+   "K0": 41927301,
+   "K1@1/16": 41927301,
+   "K2@1/16": 330764103,
+   "K2@1/8": 168764004,
+   "K2@1/4": 84513852,
+   "K2@1/2": 42204186
+  },
+  "grid_K1": 16,
+  "grid_K2": 2
+ },
+ "step2": {
+  "neutral_labs": [
+   "deepseek",
+   "meta",
+   "minimax",
+   "mistral",
+   "moonshot",
+   "qwen",
+   "reflection",
+   "thinkingmachines",
+   "xai",
+   "zai"
+  ],
+  "n_checks": 8922,
+  "candidates": {
+   "K0": {
+    "grid": null,
+    "pooled_offset_when_excluded": {
+     "anthropic": 0.00222296943884032,
+     "openai": 0.012030187551371143,
+     "google": -0.014253156990211463
+    },
+    "score": 0.014253156990211463
+   },
+   "K1": {
+    "grid": 16,
+    "pooled_offset_when_excluded": {
+     "anthropic": 0.00222296943884032,
+     "openai": 0.012030187551371143,
+     "google": -0.014253156990211463
+    },
+    "score": 0.014253156990211463
+   },
+   "K2": {
+    "grid": 2,
+    "pooled_offset_when_excluded": {
+     "anthropic": 0.00222296943884032,
+     "openai": 0.008480908615407607,
+     "google": -0.008611671523574685
+    },
+    "score": 0.008611671523574685
+   }
+  },
+  "per_lab": {
+   "K0": {
+    "deepseek": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.007389162561576354,
+      "openai": 0.014778325123152709,
+      "google": -0.007389162561576354
+     }
+    },
+    "meta": {
+     "n": 2020,
+     "offset_when_excluded": {
+      "anthropic": 0.0049504950495049506,
+      "openai": 0.00891089108910891,
+      "google": -0.013861386138613862
+     }
+    },
+    "minimax": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.003694581280788177,
+      "openai": 0.014778325123152709,
+      "google": -0.011083743842364532
+     }
+    },
+    "mistral": {
+     "n": 1218,
+     "offset_when_excluded": {
+      "anthropic": -0.0002736726874657909,
+      "openai": 0.014504652435686919,
+      "google": -0.014230979748221127
+     }
+    },
+    "moonshot": {
+     "n": 812,
+     "offset_when_excluded": {
+      "anthropic": 0.0024630541871921183,
+      "openai": 0.009852216748768473,
+      "google": -0.012315270935960592
+     }
+    },
+    "qwen": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.003284072249589491,
+      "openai": 0.013136288998357963,
+      "google": -0.016420361247947456
+     }
+    },
+    "reflection": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.00041050903119868636,
+      "openai": 0.020114942528735632,
+      "google": -0.020525451559934318
+     }
+    },
+    "thinkingmachines": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.006568144499178982,
+      "openai": 0.013957307060755337,
+      "google": -0.020525451559934318
+     }
+    },
+    "xai": {
+     "n": 2436,
+     "offset_when_excluded": {
+      "anthropic": 0.002805145046524357,
+      "openai": 0.011836343732895457,
+      "google": -0.014641488779419815
+     }
+    },
+    "zai": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.004105090311986864,
+      "openai": 0.0090311986863711,
+      "google": -0.013136288998357963
+     }
+    }
+   },
+   "K1": {
+    "deepseek": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.007389162561576354,
+      "openai": 0.014778325123152709,
+      "google": -0.007389162561576354
+     }
+    },
+    "meta": {
+     "n": 2020,
+     "offset_when_excluded": {
+      "anthropic": 0.0049504950495049506,
+      "openai": 0.00891089108910891,
+      "google": -0.013861386138613862
+     }
+    },
+    "minimax": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.003694581280788177,
+      "openai": 0.014778325123152709,
+      "google": -0.011083743842364532
+     }
+    },
+    "mistral": {
+     "n": 1218,
+     "offset_when_excluded": {
+      "anthropic": -0.0002736726874657909,
+      "openai": 0.014504652435686919,
+      "google": -0.014230979748221127
+     }
+    },
+    "moonshot": {
+     "n": 812,
+     "offset_when_excluded": {
+      "anthropic": 0.0024630541871921183,
+      "openai": 0.009852216748768473,
+      "google": -0.012315270935960592
+     }
+    },
+    "qwen": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.003284072249589491,
+      "openai": 0.013136288998357963,
+      "google": -0.016420361247947456
+     }
+    },
+    "reflection": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.00041050903119868636,
+      "openai": 0.020114942528735632,
+      "google": -0.020525451559934318
+     }
+    },
+    "thinkingmachines": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.006568144499178982,
+      "openai": 0.013957307060755337,
+      "google": -0.020525451559934318
+     }
+    },
+    "xai": {
+     "n": 2436,
+     "offset_when_excluded": {
+      "anthropic": 0.002805145046524357,
+      "openai": 0.011836343732895457,
+      "google": -0.014641488779419815
+     }
+    },
+    "zai": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.004105090311986864,
+      "openai": 0.0090311986863711,
+      "google": -0.013136288998357963
+     }
+    }
+   },
+   "K2": {
+    "deepseek": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.007389162561576354,
+      "openai": 0.0090311986863711,
+      "google": -0.003694581280788177
+     }
+    },
+    "meta": {
+     "n": 2020,
+     "offset_when_excluded": {
+      "anthropic": 0.0049504950495049506,
+      "openai": 0.007260726072607261,
+      "google": -0.009075907590759076
+     }
+    },
+    "minimax": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": -0.003694581280788177,
+      "openai": 0.008620689655172414,
+      "google": -0.005336617405582923
+     }
+    },
+    "mistral": {
+     "n": 1218,
+     "offset_when_excluded": {
+      "anthropic": -0.0002736726874657909,
+      "openai": 0.009441707717569787,
+      "google": -0.008210180623973728
+     }
+    },
+    "moonshot": {
+     "n": 812,
+     "offset_when_excluded": {
+      "anthropic": 0.0024630541871921183,
+      "openai": 0.008004926108374385,
+      "google": -0.007799671592775041
+     }
+    },
+    "qwen": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.003284072249589491,
+      "openai": 0.010262725779967159,
+      "google": -0.011904761904761904
+     }
+    },
+    "reflection": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.00041050903119868636,
+      "openai": 0.017241379310344827,
+      "google": -0.01600985221674877
+     }
+    },
+    "thinkingmachines": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.006568144499178982,
+      "openai": 0.011904761904761904,
+      "google": -0.015188834154351396
+     }
+    },
+    "xai": {
+     "n": 2436,
+     "offset_when_excluded": {
+      "anthropic": 0.002805145046524357,
+      "openai": 0.007047071702244116,
+      "google": -0.007320744389709907
+     }
+    },
+    "zai": {
+     "n": 406,
+     "offset_when_excluded": {
+      "anthropic": 0.004105090311986864,
+      "openai": 0.006568144499178982,
+      "google": -0.007799671592775041
+     }
+    }
+   }
+  },
+  "chosen": "K2"
+ },
+ "constants": {
+  "rule": "K2",
+  "grid": 2,
+  "yes_rate": {
+   "anthropic": 0.8276171262048868,
+   "openai": 0.8080026899798252,
+   "google": 0.8605693790629904
+  },
+  "offsets": {
+   "anthropic": "0",
+   "openai": "0",
+   "google": "0"
+  },
+  "cells": {
+   "anthropic|00": "0",
+   "anthropic|01": "1/2",
+   "anthropic|10": "1/2",
+   "anthropic|11": "1",
+   "openai|00": "0",
+   "openai|01": "1/2",
+   "openai|10": "0",
+   "openai|11": "1",
+   "google|00": "0",
+   "google|01": "1",
+   "google|10": "1/2",
+   "google|11": "1"
+  },
+  "cell_n": {
+   "anthropic|00": 1181,
+   "anthropic|01": 532,
+   "anthropic|10": 63,
+   "anthropic|11": 7146,
+   "openai|00": 1054,
+   "openai|01": 484,
+   "openai|10": 190,
+   "openai|11": 7194,
+   "google|00": 1236,
+   "google|01": 302,
+   "google|10": 477,
+   "google|11": 6907
+  },
+  "cell_order": {
+   "anthropic": [
+    "openai",
+    "google"
+   ],
+   "openai": [
+    "anthropic",
+    "google"
+   ],
+   "google": [
+    "anthropic",
+    "openai"
+   ]
+  }
+ }
+}

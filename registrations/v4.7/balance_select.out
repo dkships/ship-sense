@@ -1,0 +1,67 @@
+66 models; 8,922 neutral checks from 10 labs with no reviewer in the pool
+step 1  K0 (no constants): widest lattice 41,927,301
+step 1  K1 at 1/16: widest lattice 41,927,301  fits
+step 1  K2 at 1/16: widest lattice 330,764,103  exceeds the guard
+step 1  K2 at 1/8: widest lattice 168,764,004  exceeds the guard
+step 1  K2 at 1/4: widest lattice 84,513,852  exceeds the guard
+step 1  K2 at 1/2: widest lattice 42,204,186  fits
+step 2  K0 (grid None): anthropic excluded +0.0022, openai excluded +0.0120, google excluded -0.0143  -> score 0.0143
+step 2  K1 (grid 16): anthropic excluded +0.0022, openai excluded +0.0120, google excluded -0.0143  -> score 0.0143
+step 2  K2 (grid 2): anthropic excluded +0.0022, openai excluded +0.0085, google excluded -0.0086  -> score 0.0086
+step 2  chosen: K2
+constants: {
+ "rule": "K2",
+ "grid": 2,
+ "yes_rate": {
+  "anthropic": 0.8276171262048868,
+  "openai": 0.8080026899798252,
+  "google": 0.8605693790629904
+ },
+ "offsets": {
+  "anthropic": "0",
+  "openai": "0",
+  "google": "0"
+ },
+ "cells": {
+  "anthropic|00": "0",
+  "anthropic|01": "1/2",
+  "anthropic|10": "1/2",
+  "anthropic|11": "1",
+  "openai|00": "0",
+  "openai|01": "1/2",
+  "openai|10": "0",
+  "openai|11": "1",
+  "google|00": "0",
+  "google|01": "1",
+  "google|10": "1/2",
+  "google|11": "1"
+ },
+ "cell_n": {
+  "anthropic|00": 1181,
+  "anthropic|01": 532,
+  "anthropic|10": 63,
+  "anthropic|11": 7146,
+  "openai|00": 1054,
+  "openai|01": 484,
+  "openai|10": 190,
+  "openai|11": 7194,
+  "google|00": 1236,
+  "google|01": 302,
+  "google|10": 477,
+  "google|11": 6907
+ },
+ "cell_order": {
+  "anthropic": [
+   "openai",
+   "google"
+  ],
+  "openai": [
+   "anthropic",
+   "google"
+  ],
+  "google": [
+   "anthropic",
+   "openai"
+  ]
+ }
+}

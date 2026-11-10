@@ -316,9 +316,12 @@ def test_card_never_drops_a_top_group_model_silently(tmp_path, monkeypatch):
 
 
 def test_card_says_when_one_model_alone_could_be_first(tmp_path, monkeypatch):
+    # The leader beats every model, so its range is 1-1: from v4.7 (§9d) the
+    # card names it first rather than "Only 1 of 4 could rank #1".
     ledger = _tied_top_ledger(tmp_path, monkeypatch, n_models=4, n_top=1)
     svg = lb.render_card_svg(ledger)
-    assert escape(lb.CARD_SOLE_LINE.format(m=4)) in _visible(svg)
+    assert escape(lb.CARD_FIRST_LINE.format(name="Model A", m=4)) in _visible(svg)
+    assert "could rank #1" not in _visible(svg)
     assert "Model A" in svg and "Model B" not in svg
 
 
@@ -1820,3 +1823,99 @@ def test_byline_never_breaks_a_date():
     by = lb.render_html(ledger).split('<p class="by">')[1].split("</p>")[0]
     assert '<span class="nw">2026-07-10</span>' in by
     assert ".nw{white-space:nowrap}" in lb.CSS
+
+
+def test_expected_honesty_checks_are_landmines_only():
+    # v4.7 (NEXT_VERSION §9a): false alarms stay in keys but are not graded.
+    item = {"id": "h", "type": "honesty",
+            "_key": {"id": "h", "landmines": [{"id": "a"}, {"id": "b"}],
+                     "false_alarms": [{"id": "x"}]}}
+    assert lb._expected_checks(item) == {("h", "honesty", "landmine:a"),
+                                                  ("h", "honesty", "landmine:b")}
+
+
+# --- NEXT_VERSION §9d: a sole 1-1 leader is named first ---------------------------
+def _ranked_sole_first(others_reach_one: int, n: int = 4) -> list[dict]:
+    """A leader whose range is 1-1, and `others_reach_one` models whose own
+    ranges still reach 1 (rank sets are per-model)."""
+    rows = [{"label": "A", "name": "a", "provider": "anthropic", "pos": 1, "rank_lo": 1,
+             "rank_hi": 1, "p_first": 0.9, "n_items": 82,
+             "score": {"value": 95.0, "lo": 93.0, "hi": 97.0}}]
+    for i in range(1, n):
+        lo = 1 if i <= others_reach_one else 2
+        rows.append({"label": chr(65 + i), "name": chr(97 + i), "provider": "openai",
+                     "pos": i + 1, "rank_lo": lo, "rank_hi": n, "p_first": 0.0,
+                     "n_items": 82, "score": {"value": 95.0 - i, "lo": 92.0 - i,
+                                              "hi": 97.0 - i}})
+    return rows
+
+
+def test_sole_first_is_named_and_the_rest_counted():
+    ranked = _ranked_sole_first(others_reach_one=2)
+    group, line = lb._card_top_group(ranked)
+    assert [r["label"] for r in group] == ["A"]
+    assert line == lb.CARD_FIRST_LINE.format(name="A", m=4)
+    assert lb._hero_line(ranked) == (lb.CARD_FIRST_LINE.format(name="A", m=4)
+                                     + lb.HERO_DEFAULTS
+                                     + lb.HERO_NOT_SEPARATED.format(k=2))
+    assert "could rank #1" not in lb._hero_line(ranked)
+
+
+def test_sole_first_with_no_one_else_reaching_one():
+    ranked = _ranked_sole_first(others_reach_one=0)
+    assert lb._hero_line(ranked) == lb.CARD_FIRST_LINE.format(name="A", m=4) + lb.HERO_DEFAULTS
+    # The card keeps the short line: the qualifier would shrink its headline.
+    assert lb._card_top_group(ranked)[1] == lb.CARD_FIRST_LINE.format(name="A", m=4)
+
+
+def test_two_one_one_ranges_or_none_keep_the_could_rank_line():
+    ranked = _ranked_sole_first(others_reach_one=2)
+    ranked[1]["rank_hi"] = 1                   # a second 1-1 range: the rule does not apply
+    assert lb._hero_line(ranked) == lb.CARD_TIE_LINE.format(n=3, m=4)
+    ranked = _ranked_sole_first(others_reach_one=2)
+    ranked[0]["rank_hi"] = 2                   # no 1-1 range
+    assert lb._hero_line(ranked) == lb.CARD_TIE_LINE.format(n=3, m=4)
+
+
+def test_share_description_follows_the_sole_first_rule():
+    ranked = _ranked_sole_first(others_reach_one=2)
+    run = {"bank": {"n_items": 95}, "models": ranked, "run_date": "2026-11-10"}
+    text = lb._share_description(run, ranked)
+    assert text.startswith(lb.CARD_FIRST_LINE.format(name="A", m=4))
+    assert "could rank #1" not in text
+
+
+def test_card_rows_count_the_models_not_separated_from_first():
+    ranked = _ranked_sole_first(others_reach_one=2)
+    note = tuple(line.format(k=2) for line in lb.CARD_NOT_SEPARATED_LINES)
+    rows = lb._card_rows([ranked[0]], note)
+    for line in note:
+        assert escape(line) in _visible(rows)
+    assert " ".join(note) == "+ 2 not separated from first under their own correction"
+    assert ">B<" not in rows and ">C<" not in rows
+    # The count lines fit the card's left column at its smallest type.
+    room = lb._CARD_LEFT_END - lb._CARD_PAD
+    for line in lb.CARD_NOT_SEPARATED_LINES:
+        assert lb._card_width(line.format(k=22), lb.CARD_MIN_FONT_PX) <= room
+
+
+# --- v4.7 page copy (DOCS-AUDIT-skeptic M1, M7) -------------------------------------
+def test_version_change_note_quotes_the_ledger_fall_range():
+    """VERSION_CHANGE_NOTE is version copy: its fall range must be the current
+    models' moves from the previous version's ledger entry to the latest."""
+    runs = lb.load_ledger()["runs"]
+    latest, previous = runs[-1], runs[-2]
+    current, _ = lb.split_generations(latest["models"])
+    before = {m["name"]: m["score"]["value"] for m in previous["models"]}
+    falls = [before[m["name"]] - m["score"]["value"] for m in current
+             if not m.get("is_baseline") and m["name"] in before]
+    assert falls and min(falls) > 0
+    assert f"by {min(falls):.1f} to {max(falls):.1f} points" in lb.VERSION_CHANGE_NOTE
+    assert f"What changed in {latest['version']}" in lb.VERSION_CHANGE_NOTE
+    for doc in ("CORRECTIONS.md", "RELEASES.md"):
+        assert f'{lb.REPO_URL}/blob/main/{doc}"' in lb.VERSION_CHANGE_NOTE
+
+
+def test_honesty_card_targets_missed_caveats():
+    honesty = next(d for d in lb.DIM_DEFS if d["key"] == "honesty")
+    assert honesty["targets"] == "missed caveats"
