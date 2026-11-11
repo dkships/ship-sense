@@ -46,7 +46,7 @@ from pathlib import Path
 
 import yaml
 
-from . import loader, progression, report, stats
+from . import loader, progression, report, stats, unanswered
 from .report import (DIMENSIONS, LIMITATIONS, RESOLUTION_GUIDE_PP, _is_baseline,
                      summarize)
 
@@ -62,6 +62,11 @@ SCHEMA_VERSION = 3
 # Official ranking therefore requires the complete item roster AND every expected
 # atomic check. Incomplete runs remain visible as provisional estimates.
 RANKED_COVERAGE_MIN = 1.0
+# Output-cap rule 9 (NEXT_VERSION 10i): placeholders in voice; the writer finalises.
+UNANSWERED_NOTE = "{k} of {n} answers unanswered, scored zero"
+UNANSWERED_FOOTNOTE = ("<b>Unanswered</b> means the model never gave an answer after every "
+                       "step of the output-cap rules. It scores zero on every check that "
+                       "answer carries, and the model is ranked.")
 # pairwise.json written by src.pairwise with families, raw p-values, q-values
 # and inverted CIs. Older files in the same place are release records.
 PAIRWISE_RECORD_SCHEMA = 2
@@ -450,6 +455,29 @@ def declared_provisional(run_id: str) -> dict[str, dict]:
     if not path.exists():
         return {}
     return json.loads(path.read_text()).get("provisional") or {}
+
+
+def mark_unanswered(snapshot: dict, counts: dict[str, int]) -> None:
+    """Output-cap rule 9: carry each model's count of unanswered answers (scored zero)
+    and its expected answers onto its row, so every surface can print it."""
+    defaults, registry = loader.load_models()
+    providers = {m["name"]: m["provider"] for m in registry}
+    for m in snapshot["models"]:
+        k = counts.get(m["name"])
+        if not k:
+            continue
+        generations = 1 if providers.get(m["name"]) == "mock" else int(defaults.get("generations", 1))
+        m["unanswered"] = {"count": k, "answers": m["n_items"] * generations}
+
+
+def _unanswered_html(r: dict) -> str:
+    text = _unanswered_text(r)
+    return f'<span class="ciq unans">{escape(text)}</span>' if text else ""
+
+
+def _unanswered_text(r: dict) -> str:
+    u = r.get("unanswered")
+    return UNANSWERED_NOTE.format(k=u["count"], n=u["answers"]) if u else ""
 
 
 def mark_provisional(snapshot: dict, provisional: dict[str, dict]) -> None:
@@ -1446,7 +1474,8 @@ def _model_row(r: dict, bank_n: int | None = None,
             f'<td class="rel">{released}</td>'
             f'{_price_cell(r)}'
             f'<td class="score"><span class="num big">{sc["value"]:.1f}</span>'
-            f'<span class="ciq">95% CI {sc["lo"]:.1f}&#8288;&ndash;&#8288;{sc["hi"]:.1f}</span></td>'
+            f'<span class="ciq">95% CI {sc["lo"]:.1f}&#8288;&ndash;&#8288;{sc["hi"]:.1f}</span>'
+            f'{_unanswered_html(r)}</td>'
             f'{_rank_cell(r)}'
             f'{dim_cells}'
             f'</tr>')
@@ -4248,13 +4277,16 @@ VERSION_CHANGE_NOTE = (
     "a second answer at normal weight, two calls on one case are no longer graded "
     "because the brief cannot settle them, and one stays as keyed. The regrade called "
     "no model. Every ranked current model’s score rose, by 0.04 to 0.22 points, most "
-    "at the top, and no rank changed. Nearly all of that comes from the excluded pair, "
+    "at the top, and the key decisions changed no rank. Gemini 4 Carbon entered at "
+    "11th and moved the models below it down one place. Nearly all of the gain comes "
+    "from the excluded pair, "
     "which a screen for checks the best models fail found. Claude Fable 5.2, the lead "
     "agent and the model ranked first, ran that screen and proposed the decisions, and "
     "I approved them. The registration says so. Two preview tracks "
     "are shown beside the score, outside it, and neither can yet separate the current "
-    "models. Gemini 4 Carbon is shown but not ranked: two of its answers never came "
-    "back. Scores compare only within a version. Details in "
+    "models. Gemini 4 Carbon is ranked 11th: two of its answers were asked once more "
+    "under a rule registered first, and both came back. Scores compare only within a "
+    "version. Details in "
     f'<a href="{REPO_URL}/blob/main/CORRECTIONS.md">CORRECTIONS</a> and '
     f'<a href="{REPO_URL}/blob/main/RELEASES.md">RELEASES</a>.')
 
@@ -4728,6 +4760,8 @@ def render_html(ledger: dict) -> str:
         repriced_note += (f' <b>&Dagger;</b> marks an introductory price with an announced '
                           f'end ({who}).')
     coverage_note = ""
+    if any(r.get("unanswered") for r in eligible):
+        coverage_note += f" {UNANSWERED_FOOTNOTE}"
     if partial:
         who = ", ".join(escape(r["label"]) for r in partial)
         coverage_note = (f' <b>Provisional</b> rows ({who}) are shown but not ranked: some '
@@ -5589,7 +5623,10 @@ def _board_md_row(r: dict, rank: str, cols: _BoardColumns, bank_n: int | None,
         cells[1] += f"<br>_Provisional, not ranked. {r['provisional_reason']}_"
     if cols.tested_on:
         cells.append(r.get("bench_version") or "—")
-    cells += [_md_unbroken(f"**{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}]"), rank_cell]
+    score = _md_unbroken(f"**{s['value']:.1f}** [{s['lo']:.1f}–{s['hi']:.1f}]")
+    if r.get("unanswered"):
+        score += f"<br>_{_unanswered_text(r)}_"
+    cells += [score, rank_cell]
     cells += [f"{r[d]['value']:.2f}" for d in DIMENSIONS] + [_price_md(r)]
     if cols.items:
         items = f"{r['n_items']}/{bank_n}" if bank_n else str(r["n_items"])
@@ -5827,6 +5864,7 @@ def main():
         mark_provisional(snapshot, provisional)
     except ValueError as e:
         ap.error(str(e))
+    mark_unanswered(snapshot, unanswered.counts(args.run_id))
     ledger = load_ledger(Path(args.ledger))
     new_hash = _comparison_hash(snapshot["bank"])
     new_ranked = {m["name"] for m in snapshot["models"] if not m["is_baseline"]}

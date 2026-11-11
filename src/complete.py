@@ -5,7 +5,7 @@ import argparse
 from collections import Counter
 import json
 
-from . import grade, leaderboard, loader, panel_grade, report
+from . import grade, leaderboard, loader, panel_grade, report, unanswered
 from .report import DIMENSIONS
 
 ROOT = leaderboard.ROOT
@@ -146,6 +146,10 @@ def completeness_errors(run_id: str, model_names: list[str],
             errors.append("run metadata: saved evaluation fingerprint does not match")
 
     waivers = truncation_waivers(run_id)
+    try:
+        no_answer = unanswered.registered(run_id)
+    except unanswered.UnansweredError as exc:
+        return [*errors, str(exc)]
     grader = panel_grade.run_grader(run_id)
     for name, results in selected.items():
         cfg = by_name[name]
@@ -185,6 +189,14 @@ def completeness_errors(run_id: str, model_names: list[str],
                             grader(model, it, gen, entry))
                 graded = (None if generation >= len(raw)
                           else _grade_raw_generation(item, raw[generation], grade_fn))
+                # Output-cap rule 9: a registered unanswered generation (with its
+                # attempts) is complete at no credit; it must not hold a readable answer.
+                if generation in no_answer.get((name, item["id"]), set()):
+                    if graded is not None:
+                        errors.append(f"{name}: a generation registered as unanswered "
+                                      "holds a readable answer")
+                    regraded.extend(unanswered.zero_rows(item))
+                    continue
                 if graded is None:
                     incomplete += 1
                 else:
