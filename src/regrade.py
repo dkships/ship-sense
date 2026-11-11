@@ -21,7 +21,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from . import leaderboard, loader, panel_grade
+from . import leaderboard, loader, panel_grade, unanswered
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -36,6 +36,9 @@ def regrade(run_id: str, landmines: panel_grade.LandmineSource | None = None,
         raise FileNotFoundError(f"no raw responses at {raw_dir}")
     items = {it["id"]: it for it in loader.load_cases()}
     grader = panel_grade.run_grader(run_id, landmines, pool)
+    # Output-cap rule 9: a generation registered as unanswered scores zero on every
+    # check it carries (src.unanswered); an alias twin reads its board run's policy.
+    no_answer = unanswered.registered(_policy_run(run_id))
 
     per_model: dict[str, list[dict]] = {}
     skipped: list[str] = []
@@ -48,8 +51,14 @@ def regrade(run_id: str, landmines: panel_grade.LandmineSource | None = None,
         try:  # mirror src.run: a bad raw skips that item, it doesn't crash the run
             raws = json.loads(p.read_text())
             graded: list[dict] = []
-            for generation, raw in enumerate(raws):
-                graded.extend(grader(name, item, generation, raw))
+            zeroed = no_answer.get((name, item_id), set())
+            for generation in range(max(len(raws), max(zeroed, default=-1) + 1)):
+                if generation in zeroed:
+                    graded.extend(unanswered.zero_rows(item))
+                    continue
+                if generation >= len(raws):
+                    continue
+                graded.extend(grader(name, item, generation, raws[generation]))
         except panel_grade.PanelVerdictError:
             raise  # a missing or stale verdict is never skipped silently
         except Exception as e:
@@ -81,6 +90,17 @@ def regrade(run_id: str, landmines: panel_grade.LandmineSource | None = None,
     if skipped:
         print(f"  ! {len(skipped)} raw file(s) skipped (unparseable or not in bank)")
     return per_model
+
+
+ALIAS_SUFFIX = "-alias"
+
+
+def _policy_run(run_id: str) -> str:
+    """The run whose policy.json governs `run_id`: an alias twin (raw is a symlink to
+    its board run's raw) carries no policy of its own and reads its board run's."""
+    if (ROOT / "outputs" / run_id / "policy.json").exists() or not run_id.endswith(ALIAS_SUFFIX):
+        return run_id
+    return run_id[: -len(ALIAS_SUFFIX)]
 
 
 def _install_regrade(run_dir: Path, staged: Path) -> None:

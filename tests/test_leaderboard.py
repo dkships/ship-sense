@@ -1901,16 +1901,22 @@ def test_card_rows_count_the_models_not_separated_from_first():
 
 # --- v4.7 page copy (DOCS-AUDIT-skeptic M1, M7) -------------------------------------
 def test_version_change_note_quotes_the_ledger_fall_range():
-    """VERSION_CHANGE_NOTE is version copy: its fall range must be the current
-    models' moves from the previous version's ledger entry to the latest."""
+    """VERSION_CHANGE_NOTE is version copy: its range must be the current models'
+    moves from the previous version's ledger entry to the latest (v4.7: every
+    score fell, quoted to 0.1; v4.8: every score rose by under a point, quoted
+    to 0.01 so the range is not 0.0 to 0.2)."""
     runs = lb.load_ledger()["runs"]
     latest, previous = runs[-1], runs[-2]
     current, _ = lb.split_generations(latest["models"])
     before = {m["name"]: m["score"]["value"] for m in previous["models"]}
-    falls = [before[m["name"]] - m["score"]["value"] for m in current
+    moves = [m["score"]["value"] - before[m["name"]] for m in current
              if not m.get("is_baseline") and m["name"] in before]
-    assert falls and min(falls) > 0
-    assert f"by {min(falls):.1f} to {max(falls):.1f} points" in lb.VERSION_CHANGE_NOTE
+    assert moves and (min(moves) > 0 or max(moves) < 0)
+    verb = "rose" if min(moves) > 0 else "fell"
+    sizes = sorted(abs(x) for x in moves)
+    places = 2 if sizes[-1] < 1 else 1
+    quoted = f"{verb}, by {sizes[0]:.{places}f} to {sizes[-1]:.{places}f} points"
+    assert quoted in lb.VERSION_CHANGE_NOTE
     assert f"What changed in {latest['version']}" in lb.VERSION_CHANGE_NOTE
     for doc in ("CORRECTIONS.md", "RELEASES.md"):
         assert f'{lb.REPO_URL}/blob/main/{doc}"' in lb.VERSION_CHANGE_NOTE

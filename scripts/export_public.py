@@ -19,7 +19,8 @@ def export(destination: Path) -> None:
         path = Path(name)
         if (path.parts[0] in {"notes", "outputs", "reviews", "retired"}
                 or (path.name.startswith(".env") and path.name != ".env.example")
-                or (path.parts[0] in {"cases", "keys"} and not path.name.startswith("example_"))):
+                or (path.parts[0] in {"cases", "keys", "previews"}
+                    and not path.name.startswith("example_"))):
             raise ValueError("private file in export roster")
         if (root / path).is_symlink():
             raise ValueError("symlinks require explicit export review")

@@ -15,10 +15,11 @@ bad() { say "FAIL  $*"; fail=1; }
 ok()  { say "ok    $*"; }
 
 # 1. Private paths must be gitignored and untracked.
-for p in cases/private_x keys/x reviews/x notes/x outputs/x retired/x .env CLAUDE.md; do
+for p in cases/private_x keys/x previews/claimcheck/x previews/forecast/x reviews/x notes/x outputs/x retired/x .env CLAUDE.md; do
   git check-ignore -q "$p" 2>/dev/null && ok "ignored: ${p%x}*" || bad "NOT ignored: $p"
 done
 tracked_private=$(git ls-files | grep -E '^(reviews|notes|outputs)/|^\.env$|^CLAUDE\.md$' || true)
+tracked_private="$tracked_private$(git ls-files previews | grep -Ev '^previews/[^/]+/example_[^/]*\.yaml$' || true)"
 [ -z "$tracked_private" ] && ok "no private paths tracked" || bad "tracked private paths: $tracked_private"
 
 # 2. No private item id — or id prefix (the client-name token before the first
@@ -26,7 +27,7 @@ tracked_private=$(git ls-files | grep -E '^(reviews|notes|outputs)/|^\.env$|^CLA
 #    runtime from the local private bank (never embedded here). Keys and retired
 #    items are scanned too, so an orphan or retired id still contributes its tokens.
 ids=$(
-  for p in cases/*/*.yaml keys/*.yaml retired/*/*.yaml; do
+  for p in cases/*/*.yaml keys/*.yaml retired/*/*.yaml previews/*/*.yaml; do
     [ -e "$p" ] || continue
     basename "$p" .yaml
   done | { grep -v '^example_' || true; } | sort -u
@@ -34,7 +35,8 @@ ids=$(
 # A prefix is scanned because it is normally a client-name token. A generic
 # English prefix is not one, and matches public field names ("support_flags"),
 # so it is dropped here; the full ids that carry it are still scanned above.
-generic_prefixes='^support_$'
+# Preview ids start with a track tag (cc_, fc_), not a client token.
+generic_prefixes='^(support|cc|fc)_$'
 prefixes=$(printf '%s\n' $ids | sed 's/_.*/_/' | sort -u | { grep -Ev "$generic_prefixes" || true; })
 leak=""
 for tok in $ids $prefixes; do
@@ -43,8 +45,30 @@ for tok in $ids $prefixes; do
 done
 [ -z "$leak" ] && ok "no private item ids or prefixes in tracked files" || bad "private ids leaked:$leak"
 
+# 2b. No real preview claim or question text, and no brief opening, in any tracked
+#     file (previews.json and the page are built from the aggregate only).
+"$PY" -m src.preview_publish --scan-tracked >/dev/null 2>&1 \
+  && ok "no preview case text in tracked files" || bad "preview case text in tracked files (run: $PY -m src.preview_publish --scan-tracked)"
+
 # 3. Tests green (includes the docs/README/card drift guards + privacy guard).
 "$PY" -m pytest -q >/dev/null 2>&1 && ok "test suite passes" || bad "test suite fails"
+
+# 3b. The suite as public CI runs it: a fresh copy of the committed files only (no notes/,
+#     outputs/, private cases or keys, real preview cases), in its own git repository,
+#     run with this interpreter. A test that leans on a private file passes above and
+#     fails here (the v4.8 export failed public CI this way).
+py_abs="$(cd "$(dirname "$PY")" && pwd)/$(basename "$PY")"
+public_copy="$(mktemp -d)"
+if git archive HEAD | tar -x -C "$public_copy" \
+   && (cd "$public_copy" && git init -q . && git add -A \
+       && git -c user.name=publish-check -c user.email=publish-check@localhost commit -qm copy) \
+   && (cd "$public_copy" && "$py_abs" -m pytest -q -p no:cacheprovider >/dev/null 2>&1); then
+  ok "test suite passes on a public copy (committed files only)"
+else
+  bad "test suite fails on a public copy (committed files only): rerun in $public_copy"
+  public_copy=""
+fi
+if [ -n "$public_copy" ]; then rm -rf "$public_copy"; fi
 
 # 4. Private-bank mechanical audit (strict only on source/provenance, not David sign-off).
 "$PY" -m src.bank_audit --strict >/dev/null 2>&1 && ok "bank audit passes" || bad "bank audit fails"

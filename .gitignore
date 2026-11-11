@@ -5,6 +5,14 @@ keys/*
 !cases/example_*.yaml
 !keys/example_*.yaml
 
+# --- Preview-track cases (v4.8; real client-derived briefs and keys in one file) ---
+# Everything under previews/ is private except the synthetic example_* cases.
+previews/*
+!previews/claimcheck/
+!previews/forecast/
+previews/*/*
+!previews/*/example_*.yaml
+
 # --- Second-reviewer labels (derived from the private keys) ---
 reviews/
 
