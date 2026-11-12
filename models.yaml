@@ -266,6 +266,7 @@ models:
                                  # (lowest setting `between_tools`), effort `high` (apps use medium).
                                  # Non-default temperature/top_p/top_k return 400.
     api: messages
+    max_tokens: 32768            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: peak 5,765 = 70.4% of 8,192 (outputs/2026-10-24-v4.6/policy.json rule6_next_rerun); was the 8,192 default
     structured_outputs: true
     batch_supported: true        # probed against the Batch API 2026-09-28, not the docs
     batch_discount: 0.5
@@ -297,7 +298,8 @@ models:
     price_out: 10
     api: messages
     structured_outputs: true
-    max_tokens: 32768            # rule 6 step-up 2026-10-24: one call in the last scored run hit the 8,192 cap
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: hit 32,768 once, readable, waived (v4.6 policy.json); Models API max_tokens 128,000
+                                 # was: 32768 (rule 6 step-up 2026-10-24: one call in the last scored run hit the 8,192 cap)
                                  # (a v4.1 Conviction turn, waived); Models API max_tokens 128,000 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
@@ -579,6 +581,7 @@ models:
     price_in: 5
     price_out: 30
     api: chat_completions
+    max_tokens: 32768            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: peak 6,368 = 78% of 8,192 (v4.6 policy.json); was the 8,192 default
     migration_target: responses
     structured_outputs: true
     batch_supported: true
@@ -675,7 +678,8 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true
-    max_tokens: 8192             # sizing probe 2026-10-24 (gpt-5.5's 5 longest cases): peak 5,501 tokens = 67.2% of 8,192
+    max_tokens: 32768            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: peak 7,122 = 87% of 8,192, 11 calls above 70% (v4.6 policy.json)
+                                 # was: 8192 (sizing probe 2026-10-24 (gpt-5.5's 5 longest cases): peak 5,501 tokens = 67.2% of 8,192)
     timeout_s: 600
     batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
     batch_discount: 0.5
@@ -1012,7 +1016,8 @@ models:
     price_out: 3
     api: generate_content
     structured_outputs: true
-    max_tokens: 8192             # sizing probe 2026-10-24 (gemini-3.6-flash's 5 longest cases): peak 1,594 tokens = 19.5% of 8,192
+    max_tokens: 32768            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: hit 8,192 once, readable, waived (v4.6 policy.json)
+                                 # was: 8192 (sizing probe 2026-10-24 (gemini-3.6-flash's 5 longest cases): peak 1,594 tokens = 19.5% of 8,192)
     batch_supported: true        # probed 2026-10-23 against the Batch API, not the docs
     batch_discount: 0.5
     price_verified: "2026-10-24"
@@ -1367,6 +1372,7 @@ models:
     price_out: 4.25
     price_cached_in: 0.15        # Meta caches automatically; prompt_tokens INCLUDES cached
     api: chat_completions
+    max_tokens: 32768            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: hit 8,192 three times, one waived, two re-run (v4.6 policy.json); was the 8,192 default
     migration_target: responses
     structured_outputs: true     # response_format json_schema; decoding is constrained
     batch_supported: false       # /v1/batches exists but every endpoint is "not enabled"
@@ -1457,7 +1463,8 @@ models:
     # Probed 2026-10-12 (notes/wonder-2026-10-12/): a 64-token cap returned an empty
     # answer (reasoning inside completion_tokens, like Spark), and the 5 longest-
     # answered bank items used 3,442-9,568 output tokens, so 8,192 would truncate.
-    max_tokens: 32768            # cap bounds reasoning+answer; worst measured 9,568
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: peak 24,640 = 75% of 32,768 (v4.6 policy.json); preview: 82% (2026-11-10-preview Forecast)
+                                 # was: 32768 (cap bounds reasoning+answer; worst measured 9,568)
     timeout_s: 900
     price_verified: "2026-11-09"
     price_source: "https://dev.meta.ai/docs/pricing-rate-limits"
@@ -1495,7 +1502,8 @@ models:
     api: chat_completions
     migration_target: responses
     structured_outputs: true     # strict json_schema accepted 2026-11-09 (facts_probe.out)
-    max_tokens: 32768            # sizing probe 2026-11-09 (glm-5.3's 5 longest cases: no predecessor): peak
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): preview: peak 29,365 = 90% of 32,768 (2026-11-10-preview Forecast); 77% (r2-live)
+                                 # was: 32768 (sizing probe 2026-11-09 (glm-5.3's 5 longest cases: no predecessor): peak)
                                  # 18,388 tokens, 56% of 32,768 (above 70% of 8,192); cap bounds reasoning + answer
     batch_supported: false       # 2026-11-09 notes/batch_probe.py: "batch API not enabled" (Spark 1.3 same)
     timeout_s: 900
@@ -1800,7 +1808,8 @@ models:
     price_cached_in: 0.044       # PEAK cache hit; cached ⊂ prompt_tokens (probe-verified)
     api: chat_completions
     structured_outputs: false    # json_object only on V4 — no json_schema
-    max_tokens: 32768            # cap bounds reasoning+answer; worst measured 7,224
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): preview: peak 30,678 = 94% of 32,768 (2026-11-10-r2-claimcheck); vendor maximum not in the registry: verify >= 65,536 before the run
+                                 # was: 32768 (cap bounds reasoning+answer; worst measured 7,224)
     timeout_s: 900
     batch_supported: false       # DeepSeek has no batch API at all (2026-10-07: /batches and /v1/batches 404)
     price_verified: "2026-11-09"
@@ -1950,6 +1959,10 @@ models:
     max_tokens: 65536            # rule 6 step-up 2026-10-24: its longest call in the last scored run was 29,425 tokens,
                                  # 90% of 32,768; cap bounds reasoning+answer. docs.z.ai/guides/llm/glm-5.3: "maximum
                                  # output length of 128K tokens"; the API accepted 65,536 on 2026-10-24
+                                 # v4.9 (NEXT_VERSION section 12e): rule 6 is due (peak 77.1% of 65,536,
+                                 # 2026-11-10-r2-forecast), but the next step is the vendor's documented
+                                 # maximum and "128K" was not confirmed as a number (128,000 or 131,072),
+                                 # so the cap stays at 65,536
     timeout_s: 240               # per chunk when streaming; a hang cost 45 min at 900 non-streamed
     batch_supported: false       # upload validator rejects glm-5.3 by name; control glm-5.1 passed; re-probed
                                  # 2026-10-07: glm-5.3 still off the list (1210); glm-5.1 now needs ID verification (1000)
@@ -2031,7 +2044,8 @@ models:
     price_cached_in: 0.06        # cache read; cached ⊂ prompt_tokens (probe-verified)
     api: chat_completions
     structured_outputs: false    # M3 has no response_format at all; prompt-level JSON
-    max_tokens: 32768            # cap bounds thinking+answer; worst measured 4,614
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): headline: peak 30,350 = 93% of 32,768 (v4.6 policy.json); preview: 97% (2026-11-10-r2-live)
+                                 # was: 32768 (cap bounds thinking+answer; worst measured 4,614)
     timeout_s: 900
     batch_supported: false       # docs: none; /v1/batches 403 code 2119 for this account; 2026-10-07: /v1/files 404
     price_verified: "2026-11-09"
@@ -2183,7 +2197,8 @@ models:
     # answer with the whole budget spent reasoning, and the 5 longest-answered bank
     # items used 2,547-14,035 output tokens (2 of 5 over 8,192), so the shared cap
     # would truncate. Non-streamed; one 14k-token answer runs for minutes.
-    max_tokens: 32768            # cap bounds reasoning+answer; worst measured 14,035
+    max_tokens: 65536            # rule 6 step-up for v4.9 (NEXT_VERSION section 12, proposed): preview: peak 24,601 = 75% of 32,768 (2026-11-10-preview Forecast); vendor maximum not in the registry: verify >= 65,536 before the run
+                                 # was: 32768 (cap bounds reasoning+answer; worst measured 14,035)
     timeout_s: 900
     price_source: "https://developers.reflection.ai/models"
 
