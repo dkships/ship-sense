@@ -44,7 +44,7 @@ sample:
 # Scoped like batch-prepare: the synthetic example_* items never reach the
 # leaderboard, so a paid run must not pay for them.
 live: require-models
-	./scripts/with_env.sh $(PY) -m src.run --models $(MODELS) --run-id $(RUN_ID) --workers $(WORKERS) --run-mode live --case-scope official_real_only && \
+	./scripts/with_env.sh $(PY) -m src.run --models $(MODELS) --run-id $(RUN_ID) --workers $(WORKERS) --run-mode live --case-scope official_real_only $(if $(CASES),--cases $(CASES)) && \
 	$(PY) -m src.report --run-id $(RUN_ID)
 	@echo "Done -> outputs/$(RUN_ID)/scorecard.md + audit.csv"
 

@@ -205,6 +205,7 @@ def estimate_cost_usd(cfg: dict[str, Any], usage: dict,
 PANEL_REVIEW_SHAPE = "panel_review"
 PREVIEW_CLAIMCHECK_SHAPE = "claimcheck"
 PREVIEW_FORECAST_SHAPE = "forecast"
+KEY_AUDIT_SHAPE = "key_audit"
 
 
 def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
@@ -235,6 +236,11 @@ def _json_schema(shape: str | None, item: dict | None = None) -> dict | None:
             "required": ["limitations", "conclusions"],
             "additionalProperties": False,
         }
+    if shape == KEY_AUDIT_SHAPE and item and item.get("schema"):
+        # Key-audit judges (next version): the verdict schema from src.key_audit_prompts,
+        # passed through whole. Judges audit keys and are never scored, so their
+        # verdicts and flags carry enums the vendor enforces.
+        return item["schema"]
     if shape == PANEL_REVIEW_SHAPE and item and item.get("problems"):
         # One verdict per problem key ("P1", "P2", ...): the reviewer panel's
         # reply (NEXT_VERSION §4d). `item` here is {"problems": [keys]}.

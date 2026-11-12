@@ -5,6 +5,7 @@ appends, display order by point score, self-contained HTML, and the
 hard privacy rule that no private item id ever reaches the ledger or the page.
 """
 import copy
+import hashlib
 import json
 import re
 from html import escape
@@ -481,7 +482,7 @@ def test_generation_rows_carry_the_vendor_preview_tag():
 
     html = lb.render_html(ledger)
     section = html[html.index('id="generations"'):]
-    row = section[section.index('<span class="label">Gemini 3.1 Pro'):][:400]
+    row = section[section.index(f'<span class="label">{lb._cell_label("Gemini 3.1 Pro")}'):][:400]
     assert '<abbr class="avail"' in row
 
     card = section[section.index('></span>Gemini 3.1 Pro'):][:300]
@@ -1717,8 +1718,17 @@ def test_phone_tables_let_long_model_labels_wrap():
     css = lb.CSS.replace("\n", "")
     assert "table:not(.hist):not(.matrix) .model .label{white-space:nowrap" not in css
     assert "table:not(.hist):not(.matrix) .model .label{white-space:normal" in css
-    # ...while the column stays wide enough that short names keep one line.
+    # ...while the column stays wide enough that short names keep one line;
+    # only the board table narrows it, and only under 375px.
     assert "table:not(.hist):not(.matrix) .model{min-width:10rem}" in css
+    assert ('@media(max-width:374px){.tablewrap[aria-label="Leaderboard table"] table '
+            '.model{min-width:7.5rem}' in css)
+
+
+def test_a_table_label_keeps_its_number_with_the_word_before():
+    assert lb._cell_label("Claude Sonnet 5.5") == "Claude Sonnet&nbsp;5.5"
+    assert lb._cell_label("Mistral Large 4 (Oct 29)") == "Mistral Large&nbsp;4 (Oct&nbsp;29)"
+    assert lb._cell_label("DeepSeek V4 Pro") == "DeepSeek V4 Pro"
 
 
 def test_rank_cell_escapes_the_p_first_bounds_in_html():
@@ -1885,18 +1895,73 @@ def test_share_description_follows_the_sole_first_rule():
     assert "could rank #1" not in text
 
 
-def test_card_rows_count_the_models_not_separated_from_first():
+def test_card_lists_the_models_not_separated_from_first_as_muted_rows():
     ranked = _ranked_sole_first(others_reach_one=2)
-    note = tuple(line.format(k=2) for line in lb.CARD_NOT_SEPARATED_LINES)
-    rows = lb._card_rows([ranked[0]], note)
-    for line in note:
-        assert escape(line) in _visible(rows)
-    assert " ".join(note) == "+ 2 not separated from first under their own correction"
-    assert ">B<" not in rows and ">C<" not in rows
-    # The count lines fit the card's left column at its smallest type.
+    muted, note = lb._not_separated_rows(lb._sole_first(ranked)[1])
+    assert [r["label"] for r in muted] == ["B", "C"] and note == (lb.CARD_NOT_SEPARATED_MANY,)
+    rows = lb._card_rows([ranked[0]], note, muted)
+    for label in (">A<", ">B<", ">C<"):
+        assert label in rows
+    assert escape(lb.CARD_NOT_SEPARATED_MANY) in _visible(rows) and ">D<" not in rows
+    assert rows.count(lb._CARD_MUTED_INK) >= 2 * len(muted)
+    ticks = re.findall(r'text-anchor="middle"[^>]*>(\d+)<', rows)
+    assert len(ticks) >= 2
+    # One line under the rows, at the card's smallest type, inside the left column.
     room = lb._CARD_LEFT_END - lb._CARD_PAD
-    for line in lb.CARD_NOT_SEPARATED_LINES:
-        assert lb._card_width(line.format(k=22), lb.CARD_MIN_FONT_PX) <= room
+    for line in (lb.CARD_NOT_SEPARATED_ONE, lb.CARD_NOT_SEPARATED_MANY):
+        assert lb._card_width(line, lb.CARD_MIN_FONT_PX) <= room
+
+
+def test_one_model_not_separated_reads_in_the_singular():
+    ranked = _ranked_sole_first(others_reach_one=1)
+    muted, note = lb._not_separated_rows(lb._sole_first(ranked)[1])
+    assert len(muted) == 1 and note == (lb.CARD_NOT_SEPARATED_ONE,)
+    assert lb._hero_line(ranked).endswith(lb.HERO_NOT_SEPARATED_ONE)
+    assert "under its own correction" in lb.HERO_NOT_SEPARATED_ONE
+
+
+def test_more_than_three_not_separated_shows_two_and_a_count():
+    ranked = _ranked_sole_first(others_reach_one=5, n=7)
+    muted, note = lb._not_separated_rows(lb._sole_first(ranked)[1])
+    assert [r["label"] for r in muted] == ["B", "C"]
+    assert note == (lb.CARD_NOT_SEPARATED_MORE.format(k=3), lb.CARD_NOT_SEPARATED_MANY)
+
+
+def test_the_other_card_states_are_unchanged():
+    """The tie and the plain sole states draw exactly what they drew before the
+    muted rows were added (sha256 of the head and rows, taken before the change)."""
+    tie = _ranked_sole_first(others_reach_one=2)
+    tie[0]["rank_hi"] = 4
+    sole = _ranked_sole_first(others_reach_one=0)
+    expected = {"tie": "7c35c89153df1d7d4193752db57e841487d034f04278edd07a6aa09a79acfd9c",
+                "sole": "8e1cd13b77aff4d4c87e8d08b3f64ea1af1bc1bfc89a1bbe181dd101daae85b8"}
+    for name, ranked in (("tie", tie), ("sole", sole)):
+        group, line = lb._card_top_group(ranked)
+        muted, note = lb._not_separated_rows((lb._sole_first(ranked) or (None, []))[1])
+        assert not muted and not note
+        drawn = lb._card_head(line) + lb._card_rows(group, note, muted)
+        assert hashlib.sha256(drawn.encode()).hexdigest() == expected[name]
+
+
+def test_the_chart_band_names_a_sole_leader_in_the_rules_words():
+    one = _ranked_sole_first(others_reach_one=1)
+    lines = lb._field_caption_lines(2, lb._FieldLayout.WIDE, one)
+    assert " ".join(lines) == (
+        "A ranks first. B is not separated from first under its own correction: its own "
+        "comparisons cannot rule out first place (95%, Holm-corrected within each model’s own "
+        "comparisons).")
+    # The wide chart wraps it too, so the sentence never runs off the band.
+    assert len(lines) == 2 and all(len(x) <= lb._FIELD_WIDE_WRAP for x in lines)
+    two = _ranked_sole_first(others_reach_one=2)
+    caption = " ".join(lb._field_caption_lines(3, lb._FieldLayout.NARROW, two))
+    assert caption.startswith("A ranks first. B and C are not separated from first under their own "
+                              "correction: their own comparisons cannot rule out first place")
+    # The tie state keeps its caption exactly, on both layouts.
+    tie = _ranked_sole_first(others_reach_one=2)
+    tie[0]["rank_hi"] = 4
+    for layout in lb._FieldLayout:
+        assert lb._field_caption_lines(3, layout, tie) == lb._field_caption_lines(3, layout)
+        assert lb.FIELD_BAND_CAPTION.format(n=3) in " ".join(lb._field_caption_lines(3, layout, tie))
 
 
 # --- v4.7 page copy (DOCS-AUDIT-skeptic M1, M7) -------------------------------------
@@ -1911,12 +1976,17 @@ def test_version_change_note_quotes_the_ledger_fall_range():
     before = {m["name"]: m["score"]["value"] for m in previous["models"]}
     moves = [m["score"]["value"] - before[m["name"]] for m in current
              if not m.get("is_baseline") and m["name"] in before]
-    assert moves and (min(moves) > 0 or max(moves) < 0)
-    verb = "rose" if min(moves) > 0 else "fell"
+    assert moves
     sizes = sorted(abs(x) for x in moves)
     places = 2 if sizes[-1] < 1 else 1
-    quoted = f"{verb}, by {sizes[0]:.{places}f} to {sizes[-1]:.{places}f} points"
-    assert quoted in lb.VERSION_CHANGE_NOTE
+    if min(moves) > 0 or max(moves) < 0:
+        verb = "rose" if min(moves) > 0 else "fell"
+        quoted = f"{verb}, by {sizes[0]:.{places}f} to {sizes[-1]:.{places}f} points"
+    else:   # v4.9: some rose and some fell, so the range is signed
+        quoted = f"moved by {min(moves):+.{places}f} to {max(moves):+.{places}f} points"
+    # The copy prints a true minus sign (U+2212); the range is the same.
+    note = lb.VERSION_CHANGE_NOTE.replace("\u2212", "-")
+    assert quoted in note
     assert f"What changed in {latest['version']}" in lb.VERSION_CHANGE_NOTE
     for doc in ("CORRECTIONS.md", "RELEASES.md"):
         assert f'{lb.REPO_URL}/blob/main/{doc}"' in lb.VERSION_CHANGE_NOTE

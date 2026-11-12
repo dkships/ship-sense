@@ -238,7 +238,7 @@ def test_page_section_draws_four_panels_from_one_run():
     # Every plotted model is in the table twin; the previous generation is
     # drawn hollow and named as having left the board.
     for label in ("Lab A 2", "Lab A 1", "Lab B Pro", "Lab C Max"):
-        assert f'<span class="label">{label}</span>' in section
+        assert f'<span class="label">{lb._cell_label(label)}</span>' in section
     assert 'fill="var(--paper)" stroke="#c15f3c"' in section
     assert "left the board" in section
     # One run only: a model from the earlier version is never plotted, but

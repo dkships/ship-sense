@@ -232,13 +232,13 @@ def test_readme_previews_block_matches_previews_json():
     text = lb.README.read_text()
     assert lb.README_PREVIEWS_START in text and lb.README_PREVIEWS_END in text
     block = text.split(lb.README_PREVIEWS_START)[1].split(lb.README_PREVIEWS_END)[0]
-    expected = lb.render_previews_md(lb.load_previews())
+    expected = lb.current_previews_md()
     assert block.strip("\n") == expected.strip("\n")
 
 
 def test_page_previews_section_matches_previews_json():
     page = (lb.DOCS / "index.html").read_text()
-    section = lb._previews_section(lb.load_previews())
+    section = lb.current_previews_section()
     if not section:
         assert 'id="previews"' not in page
         return
@@ -294,7 +294,7 @@ def test_provisional_model_is_named_as_such_on_both_surfaces():
     data = _synthetic()
     data["lineup"][3]["headline_provisional"] = True
     html = lb._previews_section(data)
-    row = html.split("Model 3</span>")[1].split("</tr>")[0]
+    row = html.split("Model&nbsp;3</span>")[1].split("</tr>")[0]
     assert lb.PREVIEW_PROVISIONAL_NOTE in row
     # Said once, in the section intro: what "of n" covers, and who the agreement uses.
     intro = html.split('<p class="lead-in">')[1].split("</p>")[0]
@@ -312,7 +312,7 @@ def test_tables_follow_the_lineup_order_not_the_track_score():
     data = _synthetic()
     html = lb._previews_section(data)
     for block in html.split('class="ptrack"')[1:]:
-        order = [block.index(f">Model {i}<") for i in range(4)]
+        order = [block.index(f">Model&nbsp;{i}<") for i in range(4)]
         assert order == sorted(order)          # lineup order, whatever the scores
 
 

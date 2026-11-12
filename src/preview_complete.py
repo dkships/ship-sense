@@ -13,7 +13,7 @@ import json
 import sys
 
 from . import complete, preview_grade, preview_run
-from .preview_run import GENERATIONS, MOCK, RunPaths, read_json
+from .preview_run import MOCK, RunPaths, read_json
 from .preview import Track
 
 POLICY_FILE = "policy.json"
@@ -41,16 +41,26 @@ def _rows_key(rows: list[dict]) -> list[tuple]:
 
 
 def model_report(paths: RunPaths, model: str, provider: str, cases, waivers: dict) -> dict:
-    counts = {"expected": len(cases) * GENERATIONS, "missing": 0, "bad_trace": 0,
+    generations = preview_run.run_generations(paths)
+    counts = {"expected": len(cases) * generations, "missing": 0, "bad_trace": 0,
               "unparseable": 0, "truncated": 0, "waived": 0, "extra": 0}
+    # Round two (output-cap rule 9): a generation registered unanswered after the full
+    # ladder is complete as recorded; it is counted apart, never as missing.
+    round_two = bool((read_json(paths.run_file, {}) or {}).get(preview_run.ROUND_TWO_FIELD))
+    unanswered = preview_run.registered_unanswered(paths) if round_two else {}
+    if round_two:
+        counts["unanswered"] = 0
     for case in cases:
         raws = read_json(paths.raw(model, case.id), [])
         traces = read_json(paths.trace(model, case.id), [])
-        counts["extra"] += max(0, len(raws) - GENERATIONS)
+        counts["extra"] += max(0, len(raws) - generations)
         waived_gens = waivers.get(model, {}).get(case.id, [])
-        for g in range(GENERATIONS):
+        for g in range(generations):
             text = raws[g] if g < len(raws) else ""
             trace = traces[g] if g < len(traces) else None
+            if g in unanswered.get((model, case.id), set()):
+                counts["unanswered"] += 1
+                continue
             if not isinstance(text, str) or not text.strip():
                 counts["missing"] += 1
                 continue
@@ -64,11 +74,12 @@ def model_report(paths: RunPaths, model: str, provider: str, cases, waivers: dic
     return counts
 
 
-def errors_for(run_id: str, track: Track, model_names: list[str]) -> tuple[list[str], dict]:
+def errors_for(run_id: str, track: Track, model_names: list[str],
+               cases_dir=None) -> tuple[list[str], dict]:
     """(blocking errors, per-model counts)."""
     paths = RunPaths(run_id, track)
     try:
-        cases = preview_run.run_cases(paths)
+        cases = preview_run.run_cases(paths, cases_dir)
     except (FileNotFoundError, ValueError) as exc:
         return [str(exc)], {}
     _, by_name = preview_run._registry()
@@ -106,8 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--track", required=True, choices=[t.value for t in Track])
     ap.add_argument("--models", nargs="+", required=True)
+    preview_run.cases_dir_arg(ap)
     args = ap.parse_args(argv)
-    errors, reports = errors_for(args.run_id, Track(args.track), args.models)
+    errors, reports = errors_for(args.run_id, Track(args.track), args.models, args.cases_dir)
     print(json.dumps(reports, indent=2))
     if errors:
         print("Run is incomplete:\n  - " + "\n  - ".join(errors), file=sys.stderr)

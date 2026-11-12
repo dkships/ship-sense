@@ -59,7 +59,7 @@ def test_link_preview_counts_the_provisional_row_apart(tmp_path, monkeypatch):
 def test_row_reads_as_unranked_with_its_reason(tmp_path, monkeypatch):
     ledger = _with_provisional(_tied_top_ledger(tmp_path, monkeypatch, n_models=6, n_top=1))
     html = lb.render_html(ledger)
-    row = html.split("Provisional 0")[1].split("</tr>")[0]
+    row = html.split("Provisional&nbsp;0")[1].split("</tr>")[0]
     assert f"Provisional, not ranked. {escape(REASON)}" in row
     assert '<td class="rrange">&mdash;</td>' in row
     assert "<b>Provisional</b> rows (Provisional 0) are shown but not ranked" in html
