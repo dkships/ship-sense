@@ -171,6 +171,15 @@ def _stored_dir(directory: Path) -> str:
         return str(resolved)
 
 
+def _same_dir(recorded: str | None, stored: str | None) -> bool:
+    """Whether two stored cases folders are one folder on disk. A run started in
+    another checkout records the same folder under another spelling (an absolute
+    path, or a path through a link), and a model added later must still join it."""
+    if recorded is None or stored is None:
+        return recorded == stored
+    return (ROOT / recorded).resolve() == (ROOT / stored).resolve()
+
+
 def _cases_root(cases: list[PreviewCase]) -> str | None:
     """The stored cases folder of a set of loaded cases, or None for previews/."""
     roots = {case.path.parent.parent.resolve() for case in cases if case.path}
@@ -224,7 +233,7 @@ def register_run(paths: RunPaths, cases: list[PreviewCase], models: dict[str, di
             record[MODE_FIELD] = mode.value
         if _is_round_two(cases_dir, paths.track):
             record[ROUND_TWO_FIELD] = True
-    if record.get(CASES_DIR_FIELD) != cases_dir or record.get(FOLDER_FIELD) != folder:
+    if not _same_dir(record.get(CASES_DIR_FIELD), cases_dir) or record.get(FOLDER_FIELD) != folder:
         raise ValueError("these cases come from a different folder than this run's; "
                          "use a new run id")
     if record.get(MODE_FIELD, Mode.NORMAL.value) != mode.value:
@@ -256,7 +265,8 @@ def run_cases(paths: RunPaths, cases_dir: Path | None = None) -> list[PreviewCas
     if record is None:
         raise FileNotFoundError(f"no {RUN_FILE} for this run and track")
     recorded = record.get(CASES_DIR_FIELD)
-    if cases_dir is not None and _stored_dir(cases_dir) != (recorded or _stored_dir(preview.PREVIEWS_DIR)):
+    if cases_dir is not None and not _same_dir(recorded or _stored_dir(preview.PREVIEWS_DIR),
+                                               _stored_dir(cases_dir)):
         raise ValueError(f"this run's cases are in {recorded or 'previews/'}, not {cases_dir}")
     root = ROOT / recorded if recorded else None
     cases = preview.load_cases(paths.track, CaseScope.ALL, list(record["cases"]), root=root,

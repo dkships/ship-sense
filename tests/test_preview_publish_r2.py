@@ -2,6 +2,7 @@
 here is a mock run on synthetic cases under outputs/pytest-*; no test reads notes/ or a
 real run, so the suite passes on the public copy."""
 import copy
+from html import escape
 import json
 from pathlib import Path
 import uuid
@@ -9,7 +10,8 @@ import uuid
 import pytest
 import yaml
 
-from src import leaderboard as lb, preview, preview_publish_r2 as pub, preview_round2 as r2, preview_run
+from src import (leaderboard as lb, preview, preview_publish as p1, preview_publish_r2 as pub,
+                 preview_round2 as r2, preview_run)
 from src.preview import CaseScope, Track
 from src.preview_run import Mode, RunPaths
 
@@ -82,8 +84,14 @@ def world(tmp_path):
     _run(runs.live, Track.FORECAST, MODELS, root, r2.LIVE_FOLDER)
     _run(runs.nobrief, Track.FORECAST, MODELS, root, mode=Mode.NO_BRIEF)
     _run(runs.nobrief_live, Track.FORECAST, MODELS, root, r2.LIVE_FOLDER, mode=Mode.NO_BRIEF)
-    _run(runs.v48, Track.FORECAST, MODELS)                                  # v4.8-format examples
-    _run(runs.nobrief_v48, Track.FORECAST, MODELS, mode=Mode.NO_BRIEF)
+    # v4.8-format examples, copied to their own root: with no root the run would read
+    # previews/, which holds real cases wherever the private bank is checked out.
+    v48_root = tmp_path / "sets" / "v48"
+    (v48_root / Track.FORECAST.value).mkdir(parents=True)
+    for record in _examples(Track.FORECAST):
+        (v48_root / Track.FORECAST.value / f"{record['id']}.yaml").write_text(yaml.safe_dump(record))
+    _run(runs.v48, Track.FORECAST, MODELS, v48_root)
+    _run(runs.nobrief_v48, Track.FORECAST, MODELS, v48_root, mode=Mode.NO_BRIEF)
     _run(runs.calibration, Track.CLAIMCHECK, MODELS, root)
     late = {r["id"] for r in _examples(Track.FORECAST)}
     v48_orgs = {cid: "org-old" for cid in late}
@@ -177,6 +185,125 @@ def test_published_data_and_page_carry_no_case_content(world, monkeypatch, tmp_p
 ])
 def test_scan_finds_case_ids_only(text, hits):
     assert pub.scan(text, []) == hits
+
+
+# --- A model added after the round (lead ruling 2026-11-12) -------------------------------------------
+def _entry(name: str, label: str, score: float) -> dict:
+    return {"name": name, "label": label, "provider": "mock", "score": {"value": score},
+            "is_baseline": False, "ranked_eligible": True}
+
+
+def _boards(path: Path, *boards: tuple[str, list[dict]]) -> Path:
+    path.write_text(json.dumps({"runs": [{"version": v, "models": m} for v, m in boards]}))
+    return path
+
+
+def _later_ledgers(tmp_path: Path) -> tuple[Path, Path]:
+    """The round's board (v4.8) holds only the weak mock; a later board adds the strong one."""
+    weak = _entry("mock-weak", "Mock (weak)", 70.0)
+    strong = _entry("mock-strong", "Mock (strong)", 90.0)
+    alone = _boards(tmp_path / "alone.json", (pub.ROUND_BOARD, [weak]))
+    later = _boards(tmp_path / "later.json", (pub.ROUND_BOARD, [weak]), ("v9.9", [weak, strong]))
+    return alone, later
+
+
+def _without_later(data: dict) -> dict:
+    return {k: v for k, v in data.items() if k != "added_later"}
+
+
+def test_a_later_model_leaves_every_round_figure_unchanged(world, tmp_path):
+    runs, late, orgs, _, _ = world
+    alone, later = _later_ledgers(tmp_path)
+    before = pub.build(runs, late, orgs, ledger=alone)
+    after = pub.build(runs, late, orgs, ledger=later)
+    assert "added_later" not in before
+    assert json.dumps(_without_later(after), sort_keys=True) == json.dumps(before, sort_keys=True)
+    assert after["board_version"] == pub.ROUND_BOARD
+    assert [m["name"] for m in after["lineup"]] == ["mock-weak"]
+
+
+def test_a_later_model_appears_only_under_added_later(world, tmp_path):
+    runs, late, orgs, _, _ = world
+    _, later = _later_ledgers(tmp_path)
+    data = pub.build(runs, late, orgs, ledger=later)
+    # The calibration block lists the models in its own run, whatever the lineup.
+    round_only = {k: v for k, v in _without_later(data).items() if k != "calibration"}
+    assert "mock-strong" not in json.dumps(round_only)
+    [entry] = data["added_later"]
+    assert (entry["name"], entry["label"], entry["provider"]) == ("mock-strong", "Mock (strong)", "mock")
+    assert entry["answered"]["first"] and entry["answered"]["last"]
+    world_cc = pub.build(runs, late, orgs, ledger=world[3])["tracks"]["claimcheck"]["models"]["mock-strong"]
+    assert entry["claimcheck"] == world_cc
+    assert set(entry["claimcheck_by_trap_type"]) <= set(preview.TRAPS)
+    assert set(entry["forecast"]) == {"pooled", "new_only", "pooled_without_late_context"}
+    assert {"score", "ci95_org", "ci95_case"} <= set(entry["forecast"]["pooled"])
+    assert set(entry["paired_vs_baselines"]) == {"plan", "haircut", "hindsight", "naive_last", "naive_run_rate"}
+    assert set(entry["nobrief_difference"]) == {"v48", "new", "both"}
+    live = entry["live"]
+    assert live["answers_expected"] == live["answers_collected"] == 3 * 2
+    assert live["answers_unreadable"] == 0 and live["score_on_resolved"] is None
+    assert live["answered_after_result"] == 0   # the synthetic live questions resolve in December
+
+
+def test_live_answers_after_the_result_are_counted(world, tmp_path, monkeypatch):
+    runs, late, orgs, _, _ = world
+    _, later = _later_ledgers(tmp_path)
+    monkeypatch.setattr(pub, "_utc_day", lambda stamp: "2027-06-01")
+    [entry] = pub.build(runs, late, orgs, ledger=later)["added_later"]
+    assert entry["live"]["answered_after_result"] == entry["live"]["answers_collected"]
+
+
+def test_an_incomplete_later_model_is_refused(world, tmp_path):
+    runs, late, orgs, _, root = world
+    _, later = _later_ledgers(tmp_path)
+    fresh = pub.Runs(**{**runs.__dict__, "nobrief_live": f"pytest-pub-later-{uuid.uuid4().hex[:6]}"})
+    _run(fresh.nobrief_live, Track.FORECAST, ["mock-weak"], root, r2.LIVE_FOLDER, mode=Mode.NO_BRIEF)
+    with pytest.raises(pub.Incomplete, match=f"mock-strong on {fresh.nobrief_live}: not registered"):
+        pub.build(fresh, late, orgs, ledger=later)
+
+
+def test_page_and_readme_show_later_rows_after_the_round(world, tmp_path, monkeypatch):
+    runs, late, orgs, _, root = world
+    _, later = _later_ledgers(tmp_path)
+    data = pub.build(runs, late, orgs, ledger=later)
+    path = tmp_path / "previews_round2.json"
+    path.write_text(json.dumps(data))
+    monkeypatch.setattr(lb, "PREVIEWS_R2_FILE", path)
+    html, block = lb.current_previews_section(), lb.current_previews_md()
+    note = lb._r2_later_note(data)
+    assert "Mock (strong) was added after this round" in note and "round's own 1 model" in note
+    for text in (html, block):
+        assert text.index("Mock (weak)") < text.index("Mock (strong)")
+    assert html.count(f'<span class="cov">{lb.PREVIEW_R2_LATER_MARK}</span>') == 2
+    assert html.count(escape(note)) == 2
+    assert block.count(lb.PREVIEW_R2_LATER_MD) == 1 and note in block
+    cases = [c for t, f in ((Track.CLAIMCHECK, None), (Track.FORECAST, None), (Track.FORECAST, r2.LIVE_FOLDER))
+             for c in preview.load_cases(t, CaseScope.ALL, root=root, folder=f)]
+    private = pub.private_texts(cases, ["org-cc0", "org-fc1"])
+    assert pub.scan(json.dumps(data), private) == pub.scan(html, private) == pub.scan(block, private) == []
+
+
+def test_current_lineup_reads_a_named_board(tmp_path):
+    _, later = _later_ledgers(tmp_path)
+    assert [m["name"] for m in p1.current_lineup(later)] == ["mock-strong", "mock-weak"]
+    named = p1.current_lineup(later, pub.ROUND_BOARD)
+    assert [m["name"] for m in named] == ["mock-weak"] and named[0]["board_version"] == pub.ROUND_BOARD
+    with pytest.raises(ValueError, match="v0.1"):
+        p1.current_lineup(later, "v0.1")
+
+
+def test_no_later_model_means_no_later_note():
+    assert lb._r2_later_note({"lineup": []}) == ""
+
+
+def test_later_note_prints_no_utc_answer_date():
+    # The stored answer date is a UTC day; public dates are Pacific, so the
+    # note names no date and the dated prose carries it.
+    data = {"lineup": [{"name": "mock-weak"}],
+            "added_later": [{"label": "Mock (strong)", "answered": {"first": "2026-11-13", "last": "2026-11-13"}}]}
+    note = lb._r2_later_note(data)
+    assert "Mock (strong) was added after this round" in note
+    assert "November" not in note and "2026" not in note
 
 
 def test_scan_finds_private_text():
@@ -279,3 +406,46 @@ def test_round_two_caption_names_the_board_it_ran_on():
         assert html.count(f"In {data['board_version']}&#x27;s Ship Sense Score order") == 2
     # Round one's tables keep the plain caption.
     assert f"_{lb.PREVIEW_TABLE_CAPTION}_" in lb.render_previews_md(lb.load_previews())
+
+
+def _left_ledgers(tmp_path: Path) -> tuple[Path, Path]:
+    """The round's board holds both mocks; a later board keeps only the strong one."""
+    weak = _entry("mock-weak", "Mock (weak)", 70.0)
+    strong = _entry("mock-strong", "Mock (strong)", 90.0)
+    both = _boards(tmp_path / "both.json", (pub.ROUND_BOARD, [weak, strong]))
+    left = _boards(tmp_path / "left.json", (pub.ROUND_BOARD, [weak, strong]), ("v9.9", [strong]))
+    return both, left
+
+
+def test_a_round_model_that_left_is_listed_and_nothing_else_moves(world, tmp_path):
+    runs, late, orgs, _, _ = world
+    both, left = _left_ledgers(tmp_path)
+    before = pub.build(runs, late, orgs, ledger=both)
+    after = pub.build(runs, late, orgs, ledger=left)
+    assert "no_longer_current" not in before
+    assert after["no_longer_current"] == ["mock-weak"]
+    rest = {k: v for k, v in after.items() if k != "no_longer_current"}
+    assert json.dumps(rest, sort_keys=True) == json.dumps(before, sort_keys=True)
+
+
+def test_page_and_readme_mark_a_round_model_that_left(world, tmp_path, monkeypatch):
+    runs, late, orgs, _, _ = world
+    _, left = _left_ledgers(tmp_path)
+    data = pub.build(runs, late, orgs, ledger=left)
+    path = tmp_path / "previews_round2.json"
+    path.write_text(json.dumps(data))
+    monkeypatch.setattr(lb, "PREVIEWS_R2_FILE", path)
+    html, block = lb.current_previews_section(), lb.current_previews_md()
+    assert f"Mock (weak) {lb.PREVIEW_R2_GONE_MD}" in block
+    assert block.count(lb.PREVIEW_R2_GONE_MD) == 1
+    assert html.count(f'<span class="cov">{lb.PREVIEW_R2_GONE_MARK}</span>') == 2
+    note = lb._r2_gone_note(data)
+    assert "Mock (weak)" in note and note in block and html.count(escape(note)) == 2
+
+
+def test_no_round_model_left_means_no_gone_note():
+    assert lb._r2_gone_note({"lineup": []}) == ""
+
+
+def test_rank_range_legend_example_is_not_a_board_range():
+    assert "2–5 means anywhere from second to fifth" in lb.RANK_RANGE_EXAMPLE

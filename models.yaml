@@ -833,7 +833,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-09"
+    price_verified: "2026-11-12"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2026-12-01"
@@ -872,7 +872,7 @@ models:
                                  # predecessor): peak 22,565, 69%. notes/carbon-2026-11-10/cap_events.json
     batch_supported: true        # probed against Google's Batch API 2026-11-10, not the docs
     batch_discount: 0.5          # (notes/carbon-2026-11-10/batch_probe.out; gemini-4-argon control)
-    price_verified: "2026-11-10"
+    price_verified: "2026-11-12"
     price_source: "https://aistudio.google.com/docs/pricing"
     price_pending:
       effective: "2026-12-01"
@@ -880,6 +880,48 @@ models:
       price_in: 4
       price_out: 20
       source: "https://aistudio.google.com/docs/pricing"
+  # Gemini 4 Hydrogen — generally available and added 2026-11-12 (blog.google
+  # introducing-gemini-4-hydrogen, dated Nov 12, 2026; changelog entry of the same day:
+  # "generally available (GA)"). Stable id, no preview suffix. It takes the Flash slot:
+  # the post calls it "a major standalone upgrade for teams migrating from Gemini 3.8
+  # Flash", the docs' what's-new page says "Recommended upgrade from Gemini 3.8 Flash",
+  # the models page now calls 3.8 Flash "our previous-generation Flash model" and says
+  # "For any new projects, use our latest models: Gemini 4 Hydrogen or 3.5 Flash-Lite",
+  # and its $1.50/$7.50 is the price 3.8 Flash's introductory window reverts to. So
+  # Google keeps four current tiers, one model per tier: Carbon, Argon, Hydrogen, 3.5
+  # Flash-Lite. Labels cannot infer the line change ("gemini flash" vs "gemini
+  # hydrogen"), hence the explicit `superseded_by` on gemini-3.8-flash below (the
+  # Argon / 3.1 Pro precedent, David 2026-10-13). 3.8 Flash stays served, with no
+  # shutdown date. The succession is tested as its own family of one.
+  # NO CLAIM PAIR: the post's one sentence naming another board model against it
+  # ("surpasses Argon on the Artificial Analysis Intelligence Index ... 51 vs. 50") is
+  # tied to a single named index, and the model card's table (Claude Sonnet 5.5, GPT-6.1
+  # Terra) is benchmark rows only; see the note in hypotheses.yaml v4.9.
+  # Thinking levels low/medium/high/xhigh, DEFAULT high (Carbon and Argon default to
+  # medium); we send no thinking setting. Thinking tokens bill as output. Context
+  # 1,048,576 shared across input, thinking and output; models.get on 2026-11-12 reports
+  # outputTokenLimit 65,536, batchGenerateContent supported, model_version
+  # "gemini-4-hydrogen" (notes/hydrogen-2026-11-12/facts_probe.out). Weights not released.
+  # Hydrogen has a free tier; private-bank runs use the paid key and Batch only (see the
+  # Flash note below).
+  - name: gemini-4-hydrogen
+    provider: google
+    id: gemini-4-hydrogen
+    label: "Gemini 4 Hydrogen"
+    released: "2026-11-12"       # blog.google introducing-gemini-4-hydrogen + API changelog (GA)
+    price_in: 1.5                # flat across the 1M window; not introductory; cached input $0.075
+    price_out: 7.5
+    api: generate_content
+    structured_outputs: true     # JSON response schema accepted 2026-11-12 (facts_probe.out)
+    max_tokens: 32768            # rule 1, 2026-11-12, after the registration commit (1d890fb) and before any
+                                 # scored answer: live sizing probe at 65,536 on the five cases Gemini 3.8
+                                 # Flash answered at greatest length: peak 15,664 = 48% (over 70% of 8,192).
+                                 # Same cap as 3.8 Flash, so the succession is a clean A/B; also Google
+                                 # Batch's limit per request. notes/hydrogen-2026-11-12/sizing_probe.out
+    batch_supported: true        # probed against Google's Batch API 2026-11-12, not the docs
+    batch_discount: 0.5          # (notes/hydrogen-2026-11-12/batch_probe.out; gemini-4-argon control)
+    price_verified: "2026-11-12"
+    price_source: "https://aistudio.google.com/docs/pricing"
   # Flash tiers offer Free Tier access, but official private-bank runs use paid
   # billing/Batch. Google's pricing terms say Free Tier content may be used to
   # improve products; do not send private cases through that path.
@@ -923,7 +965,7 @@ models:
                                  # (waived); models.get outputTokenLimit 65,536 (2026-10-24)
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-09"
+    price_verified: "2026-11-12"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
     price_pending:
       effective: "2027-01-01"
@@ -931,6 +973,7 @@ models:
       price_in: 1.5
       price_out: 7.5
       source: "https://ai.google.dev/gemini-api/docs/pricing"
+    superseded_by: gemini-4-hydrogen  # renamed line, same Flash slot (2026-11-12; Argon precedent)
   - name: gemini-3.7-flash
     provider: google
     id: gemini-3.7-flash
@@ -1003,7 +1046,7 @@ models:
     structured_outputs: true
     batch_supported: true
     batch_discount: 0.5
-    price_verified: "2026-11-09"
+    price_verified: "2026-11-12"
     price_source: "https://ai.google.dev/gemini-api/docs/pricing"
   - name: gemini-3-flash
     provider: google
