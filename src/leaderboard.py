@@ -4348,6 +4348,8 @@ HERO_NOT_SEPARATED_ONE = "; 1 more not separated from first under its own correc
 # first-place line only. On the card it would shrink the headline from 45 to
 # 26 px, so the card keeps the short line.
 HERO_DEFAULTS = " at each vendor’s default settings"
+# The rank-range legend's example, on the page and in the README. Not a range on the board.
+RANK_RANGE_EXAMPLE = "2–5 means anywhere from second to fifth"
 
 # What the current version changed, under the hero. Version copy, like
 # PROGRESS_TAKEAWAY: the fall range is checked against the ledger by a test.
@@ -4832,9 +4834,45 @@ PREVIEW_R2_LIVE = ("{questions} live questions in {cases} cases were asked on No
                    "resolved so far.")
 PREVIEW_R2_INTERVAL_NOTE = ("Intervals resample organisations, because cases from one "
                             "organisation are not independent.")
+# A current model added after the round: extra rows after the round's, marked, and one
+# sentence under the table. The round's figures stay its own lineup's. No date: the
+# stored answer date is a UTC day and public dates are Pacific, so the dated prose
+# (README, FINDINGS, RELEASES) says when.
+PREVIEW_R2_LATER = "{label} was added after this round and answered the same sets."
+PREVIEW_R2_LATER_SCOPE = "The reliability and agreement figures are the round's own {n} model{s}."
+PREVIEW_R2_LATER_MARK = "added after this round"
+PREVIEW_R2_LATER_MD = "_(added after this round)_"
+# A round model no longer on the latest board's current lineup: kept in the round's rows,
+# marked, and one sentence under the table.
+PREVIEW_R2_GONE = "{labels} {verb} no longer current, and {pronoun} stays in the table because {pronoun} ran the round."
+PREVIEW_R2_GONE_MARK = "no longer current"
+PREVIEW_R2_GONE_MD = "_(no longer current)_"
 PREVIEW_R2_SLOTS = ("PREVIEW_R2_LEDE", "PREVIEW_R2_CC_CAN", "PREVIEW_R2_CC_CANNOT",
                     "PREVIEW_R2_FC_CAN", "PREVIEW_R2_FC_CANNOT", "PREVIEW_R2_LIVE",
-                    "PREVIEW_R2_INTERVAL_NOTE")
+                    "PREVIEW_R2_INTERVAL_NOTE", "PREVIEW_R2_LATER", "PREVIEW_R2_LATER_SCOPE",
+                    "PREVIEW_R2_LATER_MARK", "PREVIEW_R2_GONE", "PREVIEW_R2_GONE_MARK")
+
+
+def _r2_later_note(data: dict) -> str:
+    """One plain sentence per later model, then the scope of the round's figures."""
+    later = data.get("added_later") or []
+    if not later:
+        return ""
+    parts = [PREVIEW_R2_LATER.format(label=m["label"]) for m in later]
+    n = len(data["lineup"])
+    parts.append(PREVIEW_R2_LATER_SCOPE.format(n=n, s="" if n == 1 else "s"))
+    return " ".join(parts)
+
+
+def _r2_gone_note(data: dict) -> str:
+    """One plain sentence naming the round's models that have left the current lineup."""
+    gone = set(data.get("no_longer_current") or [])
+    labels = [m["label"] for m in data["lineup"] if m["name"] in gone]
+    if not labels:
+        return ""
+    one = len(labels) == 1
+    return PREVIEW_R2_GONE.format(labels=" and ".join(labels), verb="is" if one else "are",
+                                  pronoun="it" if one else "they")
 
 
 def load_previews_r2(path: Path | None = None) -> dict | None:
@@ -4889,24 +4927,40 @@ def render_previews_r2_md(data: dict, board_version: str | None = None) -> str:
     lines += ["", f"_{_r2_caption(data, board_version)}_", "",
               "| Model | Claim check (95% CI) | Errors per 100 claims (95% CI) "
               "| Forecast, pooled, lower is better (95% CI) |", "|---|---|---|---|"]
+    gone = set(data.get("no_longer_current") or [])
     for m in data["lineup"]:
-        r, p = cc["models"].get(m["name"]), pooled.get(m["name"])
-        acc = f'{r["accuracy"]:.3f} ({_pv_ci_md(r["ci95_org"], 3)})' if r else "pending"
-        err = (f'{r["errors_per_100"]:.1f} ({_pv_ci_md(r["errors_per_100_ci95_org"], 1)}){_zero_mark(r)}'
-               if r else "pending")
-        fcs = f'{p["score"]:.3f} ({_pv_ci_md(p["ci95_org"], 3)})' if p else "pending"
         note = f" {PREVIEW_PROVISIONAL_MD}" if m.get("headline_provisional") else ""
-        lines.append(f'| {m["label"]}{_avail_md(availability().get(m["name"]))}{note} '
-                     f'| {acc} | {err} | {fcs} |')
+        note += f" {PREVIEW_R2_GONE_MD}" if m["name"] in gone else ""
+        lines.append(_r2_md_row(m, cc["models"].get(m["name"]), pooled.get(m["name"]), note))
+    later = data.get("added_later") or []
+    for m in later:
+        lines.append(_r2_md_row(m, m["claimcheck"], m["forecast"]["pooled"], f" {PREVIEW_R2_LATER_MD}"))
+    if later:
+        lines += ["", f"_{_r2_later_note(data)}_"]
+    if gone:
+        lines += ["", f"_{_r2_gone_note(data)}_"]
     if _zero_note(cc):
         lines += ["", f"_{_zero_note(cc)}_"]
     return "\n".join(lines)
 
 
-def _r2_cc_row(entry: dict, result: dict, amap: dict[str, str]) -> str:
+def _r2_md_row(m: dict, r: dict | None, p: dict | None, note: str) -> str:
+    acc = f'{r["accuracy"]:.3f} ({_pv_ci_md(r["ci95_org"], 3)})' if r else "pending"
+    err = (f'{r["errors_per_100"]:.1f} ({_pv_ci_md(r["errors_per_100_ci95_org"], 1)}){_zero_mark(r)}'
+           if r else "pending")
+    fcs = f'{p["score"]:.3f} ({_pv_ci_md(p["ci95_org"], 3)})' if p else "pending"
+    return (f'| {m["label"]}{_avail_md(availability().get(m["name"]))}{note} '
+            f'| {acc} | {err} | {fcs} |')
+
+
+def _r2_gone_marks(entry: dict, gone: set[str]) -> tuple[str, ...]:
+    return (PREVIEW_R2_GONE_MARK,) if entry["name"] in gone else ()
+
+
+def _r2_cc_row(entry: dict, result: dict, amap: dict[str, str], marks: tuple[str, ...] = ()) -> str:
     acc = result["accuracy_by_true_label"]
     labels = " · ".join(f"{acc[k]:.2f}" if acc[k] is not None else "&mdash;" for k, _ in PREVIEW_LABELS)
-    notes = []
+    notes = list(marks)
     if result.get("ungraded_generations"):
         notes.append(PREVIEW_UNREADABLE.format(k=result["ungraded_generations"]))
     if result.get("unanswered_generations"):
@@ -4918,11 +4972,11 @@ def _r2_cc_row(entry: dict, result: dict, amap: dict[str, str]) -> str:
                    f'({_pv_ci(result["errors_per_100_ci95_org"], 1)}){_zero_mark(result)}</span>', labels)
 
 
-def _r2_fc_row(entry: dict, result: dict, amap: dict[str, str]) -> str:
+def _r2_fc_row(entry: dict, result: dict, amap: dict[str, str], marks: tuple[str, ...] = ()) -> str:
     miss, cover = result.get("typical_miss_factor"), result.get("coverage_80")
     extra = (f'{"×%.2f" % miss if miss is not None else "&mdash;"} · '
              f'{"%.0f%%" % (100 * cover) if cover is not None else "&mdash;"}')
-    return _r2_row(entry, amap, [],
+    return _r2_row(entry, amap, list(marks),
                    f'<span class="num big">{result["score"]:.3f}</span>'
                    f'<span class="ciq">95% CI {_pv_ci(result["ci95_org"], 3)}</span>', extra)
 
@@ -4968,10 +5022,18 @@ def _previews_r2_section(data: dict, board_version: str | None = None) -> str:
     amap = availability()
     cc, fc, live = data["tracks"]["claimcheck"], data["tracks"]["forecast"], data["tracks"]["live"]
     pooled = fc["views"]["pooled"]
-    cc_rows = "".join(_r2_cc_row(m, cc["models"][m["name"]], amap)
+    gone = set(data.get("no_longer_current") or [])
+    cc_rows = "".join(_r2_cc_row(m, cc["models"][m["name"]], amap, _r2_gone_marks(m, gone))
                       for m in data["lineup"] if m["name"] in cc["models"])
-    fc_rows = "".join(_r2_fc_row(m, pooled["models"][m["name"]], amap)
+    fc_rows = "".join(_r2_fc_row(m, pooled["models"][m["name"]], amap, _r2_gone_marks(m, gone))
                       for m in data["lineup"] if m["name"] in pooled["models"])
+    later = data.get("added_later") or []
+    mark = (PREVIEW_R2_LATER_MARK,)
+    cc_rows += "".join(_r2_cc_row(m, m["claimcheck"], amap, mark) for m in later if m["claimcheck"])
+    fc_rows += "".join(_r2_fc_row(m, m["forecast"]["pooled"], amap, mark)
+                       for m in later if m["forecast"]["pooled"])
+    later_html = f'<p class="note">{escape(_r2_later_note(data))}</p>' if later else ""
+    later_html += f'<p class="note">{escape(_r2_gone_note(data))}</p>' if gone else ""
     s = cc["set"]
     cc_meta = (f'{s["cases"]} cases from {s["organisations"]} organisations · {s["claims"]} claims, '
                f'{s["trap_claims"]} on a named trap')
@@ -4996,14 +5058,14 @@ def _previews_r2_section(data: dict, board_version: str | None = None) -> str:
 <p class="ptask">{escape(cc["task"])}</p>
 <p class="pfinding">{escape(PREVIEW_R2_CC_CAN)} {escape(PREVIEW_R2_CC_CANNOT)}</p>
 {_r2_table(cc["title"], cc_head, cc_rows, _r2_caption(data, board_version))}
-{f'<p class="note">{escape(_zero_note(cc))}</p>' if _zero_note(cc) else ""}<p class="note">{_r2_order_note(cc)}</p>
+{later_html}{f'<p class="note">{escape(_zero_note(cc))}</p>' if _zero_note(cc) else ""}<p class="note">{_r2_order_note(cc)}</p>
 </div>
 <div class="ptrack" id="preview-forecast">
 <h3>{escape(fc["title"])} <span class="meta">{escape(fc_meta)}</span></h3>
 <p class="ptask">{escape(fc["task"])}</p>
 <p class="pfinding">{escape(PREVIEW_R2_FC_CAN)} {escape(PREVIEW_R2_FC_CANNOT)}</p>
 {_r2_table(fc["title"], fc_head, fc_rows, _r2_caption(data, board_version))}
-<p class="note">{_r2_order_note(pooled)} {escape(live_line)}</p>
+{later_html}<p class="note">{_r2_order_note(pooled)} {escape(live_line)}</p>
 </div>
 </section>"""
 
@@ -5182,8 +5244,8 @@ call or change it. The cases are real product decisions, every score comes with 
 the cases; it comes from re-drawing whole cases many times. <b>#</b> orders by point score.
 <b>Rank range</b> is the span of positions a model could hold given its head-to-head tests
 against the current lineup: 1 + the models that beat it at best, N &minus; the models it beats
-at worst (a 95% rank confidence set, Holm-corrected for running many tests at once); 1&ndash;9
-means anywhere from first to ninth. P(#1) is how often the model scores highest when the cases
+at worst (a 95% rank confidence set, Holm-corrected for running many tests at once); {RANK_RANGE_EXAMPLE}.
+P(#1) is how often the model scores highest when the cases
 are re-drawn and every model is re-scored on the same draw; it describes the data and is not a
 test. A model whose rank range reaches #1 can still trail another on the direct pair, because
 the range corrects all of its comparisons together (see Head-to-head). Each model line names the Ship Sense version it was tested on. Skill cells are scores
@@ -6106,8 +6168,8 @@ def render_markdown(ledger: dict) -> str:
                  f"(<code>{digest}</code> {hash_label}) · "
                  "# = order by point score · rank range = the positions a model could hold "
                  "given its head-to-head tests against the current lineup, adjusted for "
-                 "running many tests (a 95% rank confidence set; 1–9 means anywhere from "
-                 "first to ninth) · P(#1) = share of re-drawn case sets in which the model "
+                 f"running many tests (a 95% rank confidence set; {RANK_RANGE_EXAMPLE}) · "
+                 "P(#1) = share of re-drawn case sets in which the model "
                  f"scores highest (describes the data; not a test; rounded){tested_note} · "
                  "⚠ = provisional (not every case or check was scored, or a skill is "
                  "missing; unreadable or missing responses stay ungraded) · "

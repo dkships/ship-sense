@@ -118,6 +118,26 @@ def test_a_different_cases_dir_is_refused(named_set, tmp_path):
                              scope=CaseScope.EXAMPLES)
 
 
+def test_a_run_from_another_checkout_keeps_its_folder(named_set, tmp_path):
+    # A run started in another checkout records the same folder under another spelling
+    # (there through a link); a model added later must still be able to join it.
+    run_id = _run_id("respelled")
+    cases = preview.load_cases(Track.CLAIMCHECK, CaseScope.EXAMPLES, root=named_set)
+    preview_run.run_live(["mock-strong"], run_id, Track.CLAIMCHECK, cases, scope=CaseScope.EXAMPLES)
+    paths = preview_run.RunPaths(run_id, Track.CLAIMCHECK)
+    link = tmp_path / "linked-set"
+    link.symlink_to(named_set, target_is_directory=True)
+    record = json.loads(paths.run_file.read_text())
+    record[preview_run.CASES_DIR_FIELD] = str(link)
+    paths.run_file.write_text(json.dumps(record))
+
+    preview_run.run_live(["mock-weak"], run_id, Track.CLAIMCHECK, cases, scope=CaseScope.EXAMPLES)
+    assert [c.id for c in preview_run.run_cases(paths, named_set)] == [c.id for c in cases]
+    record = json.loads(paths.run_file.read_text())
+    assert record[preview_run.CASES_DIR_FIELD] == str(link)
+    assert set(record["models"]) == {"mock-strong", "mock-weak"}
+
+
 def test_gates_read_a_named_set(named_set, capsys):
     preview_gates.main(["--track", "claimcheck", "--only-examples", "--cases-dir", str(named_set)])
     out = json.loads(capsys.readouterr().out)

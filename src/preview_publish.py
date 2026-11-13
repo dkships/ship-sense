@@ -62,22 +62,32 @@ class PartialRun(ValueError):
 
 
 # --- Inputs --------------------------------------------------------------------------------
-def current_lineup(ledger_path: Path = LEDGER) -> list[dict]:
+def current_lineup(ledger_path: Path = LEDGER, version: str | None = None) -> list[dict]:
     """The latest board's current models in board order: ranked rows by score, then
     provisional rows (shown on the board but not ranked). Every current model is in the
     preview lineup (NEXT_VERSION 10h: a model on the board answers both tracks); a
     provisional one is flagged, and its headline score never enters the agreement
-    with the headline order."""
+    with the headline order. With `version`, the board is the last ledger run of
+    that version instead of the latest one."""
     from . import leaderboard  # the page module imports this one; keep the edge one-way
 
     runs = json.loads(ledger_path.read_text())["runs"]
-    current, _ = leaderboard.split_generations(runs[-1]["models"])
+    board = runs[-1] if version is None else _board_run(runs, version)
+    current, _ = leaderboard.split_generations(board["models"])
     rows = [m for m in current if not m.get("is_baseline")]
     rows.sort(key=lambda m: (not m.get("ranked_eligible", True), -m["score"]["value"]))
     return [{"name": m["name"], "label": m["label"], "provider": m.get("provider"),
-             "headline": m["score"]["value"], "board_version": runs[-1].get("version"),
+             "headline": m["score"]["value"], "board_version": board.get("version"),
              "headline_provisional": not m.get("ranked_eligible", True)}
             for m in rows]
+
+
+def _board_run(runs: list[dict], version: str) -> dict:
+    """The last ledger run of a board version."""
+    named = [r for r in runs if r.get("version") == version]
+    if not named:
+        raise ValueError(f"no ledger run has version {version}")
+    return named[-1]
 
 
 def frozen_set_hash(manifest_path: Path = FROZEN_MANIFEST) -> str:
