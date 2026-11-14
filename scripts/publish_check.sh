@@ -46,9 +46,11 @@ done
 [ -z "$leak" ] && ok "no private item ids or prefixes in tracked files" || bad "private ids leaked:$leak"
 
 # 2b. No real preview claim or question text, and no brief opening, in any tracked
-#     file (previews.json and the page are built from the aggregate only).
+#     file (previews.json and the page are built from the aggregate only). The scan
+#     reads both rounds' sets and fails if any of them is not checked out here.
 "$PY" -m src.preview_publish --scan-tracked >/dev/null 2>&1 \
-  && ok "no preview case text in tracked files" || bad "preview case text in tracked files (run: $PY -m src.preview_publish --scan-tracked)"
+  && ok "no preview case text in tracked files (both rounds read)" \
+  || bad "preview case text in tracked files, or a preview set is not checked out here (run: $PY -m src.preview_publish --scan-tracked)"
 
 # 3. Tests green (includes the docs/README/card drift guards + privacy guard).
 "$PY" -m pytest -q >/dev/null 2>&1 && ok "test suite passes" || bad "test suite fails"

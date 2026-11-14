@@ -524,7 +524,7 @@ def lint_text(rows: list[dict]) -> str:
 
 
 def _cmd_lint(args) -> int:
-    tracks = [Track(args.track)] if args.track else list(Track)
+    tracks = [Track(args.track)] if args.track else list(items.DRAFT_TRACKS)
     rows = lint(args.drafts, tracks, args.include_held)
     print(lint_text(rows))
     return 1 if rows else 0
@@ -568,7 +568,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("cmd", choices=["build", "lint", "estimate", "submit", "status", "fetch",
                                     "adjudicate", "delete"])
     ap.add_argument("--run-id", help="required for every command but lint")
-    ap.add_argument("--track", choices=[t.value for t in Track],
+    ap.add_argument("--track", choices=[t.value for t in items.DRAFT_TRACKS],
                     help="required for every command but lint (there: one track, else all)")
     ap.add_argument("--drafts", type=Path, default=items.DRAFTS_DIR)
     ap.add_argument("--include-held", action="store_true")

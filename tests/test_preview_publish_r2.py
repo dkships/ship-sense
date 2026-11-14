@@ -449,3 +449,32 @@ def test_no_round_model_left_means_no_gone_note():
 
 def test_rank_range_legend_example_is_not_a_board_range():
     assert "2–5 means anywhere from second to fifth" in lb.RANK_RANGE_EXAMPLE
+
+
+def test_round_two_tables_open_on_demand_and_print_open():
+    """Both round-two tables sit in disclosures under the section's finding lines,
+    and print opens them where the browser allows it."""
+    data = lb.load_previews_r2()
+    if not data:
+        pytest.skip("no round-two data in this tree")
+    html = lb._previews_r2_section(data, data["board_version"])
+    assert html.count('<details class="gdetail pdetail">') == 2
+    for block in html.split('<div class="ptrack"')[1:]:
+        assert block.index('class="pfinding"') < block.index("<details")
+        opened = block.split("<details", 1)[1].split("</details>", 1)[0]
+        assert "<summary>" in opened and '<table class="ptable">' in opened
+    css = lb.CSS.replace("\n", "")
+    assert "@media print{.pdetail::details-content{" in css
+
+
+def test_a_zero_width_accuracy_interval_points_to_its_note():
+    """"1.000 / 95% CI 1.000-1.000" read as a broken interval: on a zero-error row
+    the accuracy interval carries the same † as the errors interval, so the reader
+    finds the note that explains it. The numbers are unchanged."""
+    bound = pub.zero_error_bound(285)
+    zero = {"accuracy": 1.0, "ci95_org": [1.0, 1.0], "errors_per_100": 0.0,
+            "errors_per_100_ci95_org": [0.0, 0.0], "accuracy_by_true_label":
+            {k: 1.0 for k, _ in lb.PREVIEW_LABELS}, **bound}
+    row = lb._r2_cc_row({"name": "a", "label": "A", "provider": "mock"}, zero, {})
+    assert "95% CI 1.000&#8288;&ndash;&#8288;1.000†</span>" in row
+    assert "(0.0&#8288;&ndash;&#8288;0.0)†</span>" in row
