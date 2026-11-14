@@ -513,23 +513,23 @@ models:
     label: "GPT-5.6 Sol"
     released: "2026-07-09"       # openai.com/index/gpt-5-6 (GA; limited preview from 2026-06-26)
     price_in: 4                  # cut from $5/$30 on 2026-08-24 (-20% in / -33% out); scored at the old price
-    price_out: 20                # PROMOTIONAL: guaranteed only through 2026-11-21, so it can revert
+    price_out: 20                # PROMOTIONAL: "available until November 30, 2026" (first said through 2026-11-21), so it can revert
     api: chat_completions
     migration_target: responses
     structured_outputs: true
     batch_supported: true      # re-probed 2026-07-31: the Batch API now accepts it
     batch_discount: 0.5
-    price_verified: "2026-08-24"
+    price_verified: "2026-11-13"   # re-read: pricing page footnote and the model page give the same date and $4/$20
     price_source: "https://developers.openai.com/api/docs/pricing"
     # NOT an announced revert — OpenAI published an END DATE for the promotional
     # guarantee, not a new price. The numbers below are the PRE-promotional
-    # price, recorded so whoever re-checks on 2026-11-22 has a baseline. The
+    # price, recorded so whoever re-checks on 2026-12-01 has a baseline. The
     # block exists to ARM test_no_price_is_past_its_announced_change_date, which
     # goes red that day unless price_verified is bumped — the guard that Sonnet 5
     # and Gemini 3.6 Flash both needed and did not have. Satisfied by EITHER
     # outcome (promo held, or it reverted) so long as someone actually looks.
     price_pending:
-      effective: "2026-11-22"
+      effective: "2026-12-01"
       price_in: 5
       price_out: 30
       source: "https://developers.openai.com/api/docs/pricing"

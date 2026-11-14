@@ -180,9 +180,11 @@ def _expected_checks(item: dict) -> set[tuple[str, str, str]]:
         subs = list(key.get("labels", {}))
     elif dim == "honesty":
         # v4.7: false alarms are no longer graded (NEXT_VERSION §9a).
-        subs = [f"landmine:{x['id']}" for x in key.get("landmines", [])]
+        subs = [f"landmine:{x['id']}" for x in loader.graded_landmines(key)]
     elif dim == "conviction":
-        subs = ["initial"] + [x["id"] for x in key.get("turns", [])]
+        # v4.10: a check the review stopped grading is not an expected check.
+        initial = ["initial"] if loader.initial_graded(key) else []
+        subs = initial + [x["id"] for x in loader.graded_turns(key)]
     else:
         subs = []
     return {(item_id, dim, sub) for sub in subs}
@@ -307,11 +309,11 @@ def _saved_run_signature(run_id: str, case_scope: str) -> dict | None:
 def _triple(ci) -> dict:
     """A (value, lo, hi) CI -> plain JSON-safe dict (no numpy floats)."""
     v, lo, hi = ci
-    # Four decimals prevent double rounding when public surfaces render one
-    # decimal (64.745... must display as 64.7, not 64.8 after an intermediate
-    # round to 64.75). This still keeps the aggregate-only ledger compact.
-    return {"value": round(float(v), 4), "lo": round(float(lo), 4),
-            "hi": round(float(hi), 4)}
+    # v4.10 (SPEC section 5): stored unrounded, rounded once when printed. Up to
+    # v4.9 this stored four decimals, which itself rounded twice (96.55001 was
+    # stored as 96.55 and printed 96.5); those runs keep their stored values,
+    # because the ledger re-serialises earlier runs from their parsed JSON.
+    return {"value": float(v), "lo": float(lo), "hi": float(hi)}
 
 
 def _date_from_run_id(run_id: str) -> str | None:
@@ -1719,6 +1721,9 @@ a:focus-visible,.tablewrap:focus-visible,summary:focus-visible,abbr:focus-visibl
 outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
 code{font:.85em var(--mono);background:var(--band);border-radius:3px;padding:.06em .34em}
 b,strong{font-weight:600;color:var(--ink)}
+/* An archived board's banner (archive_banner): a quiet band above the masthead. */
+.archived{background:var(--band);border-bottom:1px solid var(--rule);color:var(--text);
+font:400 .875rem/1.5 var(--sans);padding:10px 0}
 
 /* ---- header and hero: the finding first ---- */
 .hero{padding:16px 0 0}
@@ -1781,6 +1786,9 @@ color:var(--muted);margin:0 0 16px}
 .field .frow:hover path,.field .frow:hover rect{transform-box:fill-box;transform-origin:center;transform:scale(1.2)}
 .field .frow:hover line{opacity:.9}
 .field.fnarrow{display:none}
+/* On a phone the names and scores sit over the gridlines: a paper halo keeps them clean. */
+.field.fnarrow .flabel,.field.fnarrow .fnum,.field.fnarrow .fprice{paint-order:stroke;
+stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}
 """ + _CHART_TEXT_CSS + """
 .fcap{font:400 .75rem/1.5 var(--sans);color:var(--muted);margin:8px 0 0;max-width:46em}
 
@@ -1840,6 +1848,13 @@ color:var(--muted);padding:0 0 6px}
 tr.pbase td{border-top:1px solid var(--ink);color:var(--muted);font:500 .75rem/1.3 var(--sans);
 padding-top:14px;padding-bottom:6px}
 #previews tr.baseline .num.big{font-weight:400;color:var(--muted)}
+/* A floor row: hollow mark, no lab ink, upright muted label, so it never reads as a model. */
+#previews .dot.pfloor{background:transparent;border:1.5px solid var(--muted)}
+#previews tr.baseline .label{font-weight:500;color:var(--muted)}
+.pdetail{margin:0 0 16px}
+/* Print opens the preview tables where the browser exposes the disclosure body. */
+@media print{.pdetail::details-content{content-visibility:visible;display:block}
+.gdetail.pdetail>summary::before{content:none}}
 
 /* ---- generation matchup cards: hairline-topped, no boxes ---- */
 .gcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 32px;margin:0 0 24px}
@@ -2012,6 +2027,8 @@ margin-right:-16px;padding-right:16px}
 .jump a{white-space:nowrap;padding:15px 0}
 .masthead{flex-direction:column;align-items:stretch;flex-wrap:nowrap}
 .mark{padding:12px 0 0}
+/* A step under the desktop clamp's floor: the §9d headline ran to six lines at 390px. */
+h1{font-size:1.75rem;line-height:1.12}
 h2{font-size:1.5rem}
 .kicker{font-size:1.125rem}
 .herogrid{grid-template-columns:1fr;gap:24px;padding:28px 0 0}
@@ -2517,6 +2534,11 @@ class _FieldGeom:
     tick_step: int
     head_y: float               # baseline of the extra column's head
     tick_labels: _TickLabels = _TickLabels.ALL
+    # Within a row: the name and numbers' baseline, and the interval's line. WIDE
+    # puts all of them on one line; NARROW puts the name and numbers on a line of
+    # their own above the interval, so the plot can span the drawing.
+    label_dy: float = 20.0
+    whisker_dy: float = 15.0
 
 
 _FIELD_TICK_STEP = 5            # score points between gridlines
@@ -2525,7 +2547,17 @@ _FIELD_TICK_RISE = 13           # tick labels' baseline above the first row
 _FIELD_NARROW_TICK_STEP = 10
 _FIELD_LABEL_PX = 14            # .flabel size, for the narrow column estimate
 _FIELD_LABEL_EM = 0.52          # average advance of a label glyph, in ems
-_FIELD_NARROW_LABEL_MIN, _FIELD_NARROW_LABEL_MAX = 112, 176
+# NARROW (a phone): each row is a name line over an interval line, the plot as
+# wide as the drawing; the score (and rank in group) right-align on the name line.
+#
+#   Claude Fable 5.2 preview                 96.5
+#   |----------------------------------- ──●── |
+_FIELD_NARROW_W = 360
+_FIELD_NARROW_ROW_H = 40
+_FIELD_NARROW_LABEL_DY = 15     # name line's baseline below the row top
+_FIELD_NARROW_WHISKER_DY = 29   # interval line below the row top
+_FIELD_NARROW_PLOT_LEFT = 8
+_FIELD_NARROW_PLOT_RIGHT = 348  # the mark's ring and a 100 interval's cap clear the edge
 _FIELD_WIDE_LABEL_X = 186       # WIDE: right edge of the name column, at minimum
 _FIELD_WIDE_LABEL_PAD = 8       # WIDE: air left of the longest name
 _FIELD_BAND_LINE_H = 17         # caption line pitch inside the band
@@ -2545,9 +2577,9 @@ class _ExtraColumn(Enum):
 
 def _field_geom(layout: _FieldLayout, labels: list[str], column: _ExtraColumn) -> _FieldGeom:
     """Columns for a layout. A phone has no room for a price column, and its
-    name column is sized to the longest label rather than fixed. WIDE keeps
-    its fixed name column unless a label (with its tag) would run off the
-    left edge, then widens it and narrows the plot."""
+    names sit on their own line above each interval, so its plot spans the
+    drawing. WIDE keeps its fixed name column unless a label (with its tag)
+    would run off the left edge, then widens it and narrows the plot."""
     extra = column is _ExtraColumn.SHOWN
     longest = max((len(t) for t in labels), default=0) * _FIELD_LABEL_PX * _FIELD_LABEL_EM
     if layout is _FieldLayout.WIDE:
@@ -2557,16 +2589,15 @@ def _field_geom(layout: _FieldLayout, labels: list[str], column: _ExtraColumn) -
                           extra_x=956 if extra else None, row_h=30, mark_r=5.0,
                           top=_FIELD_WIDE_TOP, tick_step=_FIELD_TICK_STEP,
                           head_y=_FIELD_WIDE_TOP - _FIELD_TICK_RISE)
-    names = min(_FIELD_NARROW_LABEL_MAX, max(_FIELD_NARROW_LABEL_MIN, longest))
     # With a second number column (rank in group), the score moves left so a
     # two-digit range ("10-19") never runs into it: score ends at 304, the
-    # range starts at about 312. The plot stops at 250 so a ▲ past an interval
-    # that reaches the top of the axis still clears the score. The column head
-    # goes up to the unit line, clear of the tick row.
-    return _FieldGeom(vw=360, label_x=2, plot_left=names + 12,
-                      plot_right=250 if extra else 312, score_x=304 if extra else 356,
-                      extra_x=356 if extra else None, row_h=30, mark_r=4.5,
-                      top=44, tick_step=_FIELD_NARROW_TICK_STEP, head_y=14)
+    # range starts at about 312. The column head goes up to the unit line,
+    # clear of the tick row.
+    return _FieldGeom(vw=_FIELD_NARROW_W, label_x=2, plot_left=_FIELD_NARROW_PLOT_LEFT,
+                      plot_right=_FIELD_NARROW_PLOT_RIGHT, score_x=304 if extra else 356,
+                      extra_x=356 if extra else None, row_h=_FIELD_NARROW_ROW_H, mark_r=4.5,
+                      top=44, tick_step=_FIELD_NARROW_TICK_STEP, head_y=14,
+                      label_dy=_FIELD_NARROW_LABEL_DY, whisker_dy=_FIELD_NARROW_WHISKER_DY)
 
 
 def _field_domain(rows: list[dict]) -> tuple[int, int]:
@@ -2652,27 +2683,26 @@ def _field_row(r: dict, y: float, g: _FieldGeom, sx, layout: _FieldLayout, *,
     (price or rank in group). `tag` and `flag` are trusted markup after the
     name and after the whisker; `tip` replaces the tooltip's dimension tail."""
     sc = r["score"]
-    cy = y + g.row_h / 2
+    cy = y + g.whisker_dy
+    ty = y + g.label_dy
     color = _provider_color(r.get("provider"))
     if tip is None:
         tip = " · ".join(f"{d[0].upper()} {r[d]['value']:.2f}" for d in DIMENSIONS)
     anchor = "end" if layout is _FieldLayout.WIDE else "start"
     if tag is None:
         tag = _avail_tspan(availability().get(r["name"]))
-    if layout is _FieldLayout.NARROW:
-        tag = ""  # no room on a phone; the table under the chart carries it
     out = (f'<g class="frow"><title>{escape(r["label"])} — {sc["value"]:.1f} '
            f'[{sc["lo"]:.1f}, {sc["hi"]:.1f}] · {escape(tip)}</title>'
-           f'<text x="{g.label_x}" y="{cy + 5:.1f}" text-anchor="{anchor}" class="flabel">'
+           f'<text x="{g.label_x}" y="{ty:.1f}" text-anchor="{anchor}" class="flabel">'
            f'{escape(r["label"])}{tag}</text>'
            f'<line x1="{sx(sc["lo"]):.1f}" y1="{cy:.1f}" x2="{sx(sc["hi"]):.1f}" y2="{cy:.1f}" '
            f'stroke="{color}" stroke-width="2.5" stroke-linecap="round" '
            f'opacity="{_FIELD_WHISKER_OPACITY}"/>'
            f'{_svg_mark(r.get("provider"), sx(sc["value"]), cy, g.mark_r, ring=ring)}{flag}'
-           f'<text x="{g.score_x}" y="{cy + 5:.1f}" text-anchor="end" class="fnum">'
+           f'<text x="{g.score_x}" y="{ty:.1f}" text-anchor="end" class="fnum">'
            f'{sc["value"]:.1f}</text>')
     if extra and g.extra_x is not None:
-        out += (f'<text x="{g.extra_x}" y="{cy + 5:.1f}" text-anchor="end" class="fprice">'
+        out += (f'<text x="{g.extra_x}" y="{ty:.1f}" text-anchor="end" class="fprice">'
                 f'{escape(extra)}</text>')
     return out + "</g>"
 
@@ -2758,7 +2788,7 @@ WEIGHTS_PENDING = "pending"
 # gap between the groups, and room under the plot for the reference label.
 _WEIGHTS_HEAD_H, _WEIGHTS_GROUP_GAP, _WEIGHTS_FOOT_H = 26, 18, 30
 WEIGHTS_RANK_HEAD = "rank in group"
-_WEIGHTS_NARROW_PLOT_RIGHT = 254   # the ▲ past a 100 interval still clears the score
+_WEIGHTS_NARROW_PLOT_RIGHT = 336   # the ▲ past a 100 interval still ends inside the drawing
 _WEIGHTS_FLAG_GAP = {_FieldLayout.WIDE: 8, _FieldLayout.NARROW: 6}
 WEIGHTS_REF_LABEL = "best open-weight {score:.1f} · ▲ decisively above it"
 
@@ -2967,11 +2997,10 @@ def _weights_geom(layout: _FieldLayout, labels: list[str]) -> _FieldGeom:
     """The field's columns with a wider name column (WIDE names carry the
     "weights due" tag) and the rank-in-group column for the extra one."""
     if layout is _FieldLayout.NARROW:
-        # The name column leaves the plot about 60px: label only its ends so
-        # the ticks never touch, and run it to the ▲'s last clear pixel.
+        # The plot stops where a ▲ past an interval that reaches the top of the
+        # axis still ends inside the drawing.
         g = _field_geom(layout, labels, _ExtraColumn.SHOWN)
-        return dataclasses.replace(g, plot_right=_WEIGHTS_NARROW_PLOT_RIGHT,
-                                   tick_labels=_TickLabels.ENDS)
+        return dataclasses.replace(g, plot_right=_WEIGHTS_NARROW_PLOT_RIGHT)
     return _FieldGeom(vw=960, label_x=248, plot_left=262, plot_right=820, score_x=880,
                       extra_x=956, row_h=30, mark_r=5.0, top=_FIELD_WIDE_TOP,
                       tick_step=_FIELD_TICK_STEP, head_y=_FIELD_WIDE_TOP - _FIELD_TICK_RISE)
@@ -3021,7 +3050,7 @@ def _weights_svg(open_rows: list[dict], closed_rows: list[dict],
             rec = _weights_record(r["name"], best_open["name"], records)
             if rec and rec.get("winner_exploratory") == r["name"]:
                 flag = (f'<text x="{sx(r["score"]["hi"]) + flag_gap:.1f}" '
-                        f'y="{y + g.row_h / 2 + 4.5:.1f}" class="fnum">&#9650;</text>')
+                        f'y="{y + g.whisker_dy + 4.5:.1f}" class="fnum">&#9650;</text>')
             tip = f"rank in group {_rank_range(r)}" + (f" · {lic[r['name']]}"
                                                          if r["name"] in lic else "")
             parts.append(_field_row(r, y, g, sx, layout, extra=_rank_range(r),
@@ -3030,16 +3059,21 @@ def _weights_svg(open_rows: list[dict], closed_rows: list[dict],
             y += g.row_h
         y += _WEIGHTS_GROUP_GAP
 
-    # The open frontier: drawn last so it reads over the gridlines, hue-neutral.
+    # The open frontier, hue-neutral, over the gridlines: drawn last on WIDE; on a
+    # phone the names cross the plot, so it goes under the rows, after the axis.
     ref = best_open["score"]["value"]
     label = escape(WEIGHTS_REF_LABEL.format(score=ref))
     label_x, anchor = sx(ref), "middle"
     if layout is _FieldLayout.NARROW:
         label_x, anchor = g.extra_x, "end"
-    parts.append(f'<line x1="{sx(ref):.1f}" y1="{g.top - 4}" x2="{sx(ref):.1f}" '
-                 f'y2="{h - _WEIGHTS_FOOT_H + 6:g}" class="fref"/>'
-                 f'<text x="{label_x:.1f}" y="{h - 8:g}" text-anchor="{anchor}" class="ftick">'
-                 f'{label}</text>')
+    frontier = (f'<line x1="{sx(ref):.1f}" y1="{g.top - 4}" x2="{sx(ref):.1f}" '
+                f'y2="{h - _WEIGHTS_FOOT_H + 6:g}" class="fref"/>'
+                f'<text x="{label_x:.1f}" y="{h - 8:g}" text-anchor="{anchor}" class="ftick">'
+                f'{label}</text>')
+    if layout is _FieldLayout.NARROW:
+        parts.insert(2, frontier)
+    else:
+        parts.append(frontier)
     parts.append("</svg>")
     return "".join(parts)
 
@@ -3613,8 +3647,8 @@ _PROG_ROLE_NOTE = ("lab-colored marks set a new best on their panel; gray marks 
 # Copy slots above the four panels, one constant each so a copy change touches
 # no code: the chart's one-line takeaway (placeholder until the copy pass) and
 # the unit its vertical scale is read in.
-PROGRESS_TAKEAWAY = ("Among models still callable, the best score by release date rose from 52.8 "
-                     "(GPT-4o mini, July 2024) to 96.5 (Claude Fable 5.2, November 2026). Before "
+PROGRESS_TAKEAWAY = ("Among models still callable, the best score by release date rose from 52.7 "
+                     "(GPT-4o mini, July 2024) to 96.6 (Claude Fable 5.2, November 2026). Before "
                      "late September 2025 every plotted model is OpenAI's, and a running best rises "
                      "and flattens on its own, so the shape shows neither a speed-up nor a "
                      "slowdown.")
@@ -4354,15 +4388,15 @@ RANK_RANGE_EXAMPLE = "2–5 means anywhere from second to fifth"
 # What the current version changed, under the hero. Version copy, like
 # PROGRESS_TAKEAWAY: the fall range is checked against the ledger by a test.
 VERSION_CHANGE_NOTE = (
-    "<b>What changed in v4.9.</b> Every model answered six new cases and one corrected "
-    "brief, and one case moved to the exposed set. Current models moved by \u22120.94 to "
-    "+0.27 points, and no registered verdict changed under the panel. Claude Opus 5.5's "
-    "rank range now reaches first, so the lead is weaker than on v4.8. The new cases were "
-    "chosen, and the one case moved out, by the lead agent, Claude Fable 5.2, which is the "
-    "model ranked first. Scores on the new cases alone and on the exposed set are in "
-    f'<a href="{REPO_URL}/blob/main/FINDINGS.md">FINDINGS</a>. Details in '
-    f'<a href="{REPO_URL}/blob/main/CORRECTIONS.md">CORRECTIONS</a> and '
-    f'<a href="{REPO_URL}/blob/main/RELEASES.md">RELEASES</a>.')
+    "<b>What changed in v4.10.</b> No model was asked anything. Three judges, the models "
+    "ranked second to fourth, reviewed 79 existing keys, and 8 checks changed, every one "
+    "from the screen for checks the top models fail. They are disagreements between a key "
+    "and top models, not verified corrections. Current models rose, by 0.08 to 0.83 points. "
+    "Claude Fable 5.2's claim over Claude Opus 5.5 holds under the panel, not under the "
+    "word-match grader, and Gemini 4 Argon's rank range now reaches first. The rules were "
+    "written by the lead agent, Claude Fable 5.2, the model ranked first. Details in "
+    f'<a href="{REPO_URL}/blob/main/RELEASES.md">RELEASES</a> and '
+    f'<a href="{REPO_URL}/blob/main/CORRECTIONS.md">CORRECTIONS</a>.')
 
 # The writer's headline, kept as the kicker over the finding.
 HERO_KICKER = "Which AI models know when to stop"
@@ -4466,6 +4500,11 @@ def _zero_note(track: dict) -> str:
         return ""
     return PREVIEW_ZERO_NOTE.format(n=rows[0]["zero_error_claims"], b=rows[0]["zero_error_upper_per_100"])
 PREVIEW_BASELINES_LABEL = "Baselines, not models"
+# Each preview table opens on demand under its finding lines, so a phone reader
+# sees the findings first and the 25-row table only when asked.
+PREVIEW_TABLE_SUMMARY = "Results for each model"
+PREVIEW_TABLE_HINT = "{n} models"
+PREVIEW_TABLE_HINT_FLOOR = "{n} models and {k} baselines"
 PREVIEW_FORECAST_CAVEAT = (
     "Most plans here are targets, not forecasts, so beating a plan is not the same as "
     "out-forecasting the people who wrote it. Each brief was also written after its "
@@ -4626,21 +4665,25 @@ def _pv_provisional(entry: dict) -> str:
     return f" &middot; {PREVIEW_PROVISIONAL_NOTE}" if entry.get("headline_provisional") else ""
 
 
+def _pv_floor_items(name: str, track: dict) -> list[tuple[str, float, str]]:
+    """(label, value, kind) for each floor row: the content-free policies (Claim
+    check) or the three baselines on the same scale (Forecast)."""
+    if name == CLAIMCHECK:
+        return [(PREVIEW_POLICY_NAMES.get(g["check"], g["check"]), g["value"], "content-free policy")
+                for g in track["floor"]["gates"]]
+    return [(label, track["floor"][key]["mean_wis"], "baseline")
+            for key, label in PREVIEW_BASELINE_NAMES]
+
+
 def _pv_floor_rows(name: str, track: dict) -> str:
     """The floor beside the models, under its own rule and label: content-free
     policies (Claim check) or the three baselines on the same scale (Forecast)."""
     out = (f'<tr class="pbase"><td colspan="3">{escape(PREVIEW_BASELINES_LABEL)}</td></tr>')
-    if name == CLAIMCHECK:
-        items = [(PREVIEW_POLICY_NAMES.get(g["check"], g["check"]), g["value"], "content-free policy")
-                 for g in track["floor"]["gates"]]
-        digits = 2
-    else:
-        items = [(label, track["floor"][key]["mean_wis"], "baseline")
-                 for key, label in PREVIEW_BASELINE_NAMES]
-        digits = 3
-    for label, value, kind in items:
-        out += (f'<tr class="baseline"><td class="model"><span class="dot" '
-                f'style="background:var(--muted)"></span><span class="mname"><span '
+    digits = 2 if name == CLAIMCHECK else 3
+    # A hollow mark with no lab ink: a floor row is never read as one more model.
+    for label, value, kind in _pv_floor_items(name, track):
+        out += (f'<tr class="baseline"><td class="model"><span class="dot pfloor">'
+                f'</span><span class="mname"><span '
                 f'class="label">{_cell_label(label)}</span><span class="provider">{kind}'
                 f'</span></span></td>'
                 f'<td class="score"><span class="num big">{value:.{digits}f}</span></td>'
@@ -4704,16 +4747,19 @@ def _pv_track_block(name: str, track: dict, data: dict) -> str:
     spread_html = f'<p class="pfinding">{escape(spread)}</p>' if spread else ""
     caveat = (f'<p class="pcaveat">{escape(PREVIEW_FORECAST_CAVEAT)}</p>'
               if name == FORECAST else "")
+    table = (f'<div class="tablewrap" tabindex="0" role="region" '
+             f'aria-label="{escape(track["title"])} results"><table class="ptable">\n'
+             f'<caption>{escape(PREVIEW_TABLE_CAPTION)}</caption>\n'
+             f'<thead><tr>{_pv_head(name)}</tr></thead>\n'
+             f'<tbody>{rows}</tbody>\n</table></div>')
+    hint = PREVIEW_TABLE_HINT_FLOOR.format(n=len(_pv_ordered(track, data)),
+                                           k=len(_pv_floor_items(name, track)))
     return f"""<div class="ptrack" id="preview-{name}">
 <h3>{escape(track["title"])} <span class="meta">{escape(_pv_set_text(name, track))}</span></h3>
 <p class="ptask">{escape(track["task"])}</p>
 <p class="pfinding">{escape(_pv_finding(name, track))}</p>
 {spread_html}{caveat}
-<div class="tablewrap" tabindex="0" role="region" aria-label="{escape(track["title"])} results"><table class="ptable">
-<caption>{escape(PREVIEW_TABLE_CAPTION)}</caption>
-<thead><tr>{_pv_head(name)}</tr></thead>
-<tbody>{rows}</tbody>
-</table></div>
+{_pv_disclosure(table, hint)}
 <p class="note">{_pv_stats_note(name, track, labels)}</p>
 </div>"""
 
@@ -4967,7 +5013,7 @@ def _r2_cc_row(entry: dict, result: dict, amap: dict[str, str], marks: tuple[str
         notes.append(f'{result["unanswered_generations"]} unanswered, scored as wrong')
     return _r2_row(entry, amap, notes,
                    f'<span class="num big">{result["accuracy"]:.3f}</span>'
-                   f'<span class="ciq">95% CI {_pv_ci(result["ci95_org"], 3)}</span>'
+                   f'<span class="ciq">95% CI {_pv_ci(result["ci95_org"], 3)}{_zero_mark(result)}</span>'
                    f'<span class="ciq">{result["errors_per_100"]:.1f} errors per 100 claims '
                    f'({_pv_ci(result["errors_per_100_ci95_org"], 1)}){_zero_mark(result)}</span>', labels)
 
@@ -5018,6 +5064,13 @@ def _r2_table(title: str, head: str, rows: str, caption: str = PREVIEW_TABLE_CAP
             f'<thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table></div>')
 
 
+def _pv_disclosure(table: str, hint: str) -> str:
+    """A preview table behind a disclosure: closed by default, opened without
+    script, and opened again for print where the browser allows it."""
+    return (f'<details class="gdetail pdetail"><summary>{escape(PREVIEW_TABLE_SUMMARY)} '
+            f'<span class="dhint">{escape(hint)}</span></summary>\n{table}\n</details>')
+
+
 def _previews_r2_section(data: dict, board_version: str | None = None) -> str:
     amap = availability()
     cc, fc, live = data["tracks"]["claimcheck"], data["tracks"]["forecast"], data["tracks"]["live"]
@@ -5032,6 +5085,12 @@ def _previews_r2_section(data: dict, board_version: str | None = None) -> str:
     cc_rows += "".join(_r2_cc_row(m, m["claimcheck"], amap, mark) for m in later if m["claimcheck"])
     fc_rows += "".join(_r2_fc_row(m, m["forecast"]["pooled"], amap, mark)
                        for m in later if m["forecast"]["pooled"])
+    cc_n = (sum(m["name"] in cc["models"] for m in data["lineup"])
+            + sum(bool(m["claimcheck"]) for m in later))
+    fc_n = (sum(m["name"] in pooled["models"] for m in data["lineup"])
+            + sum(bool(m["forecast"]["pooled"]) for m in later))
+    cc_hint = PREVIEW_TABLE_HINT.format(n=cc_n)
+    fc_hint = PREVIEW_TABLE_HINT.format(n=fc_n)
     later_html = f'<p class="note">{escape(_r2_later_note(data))}</p>' if later else ""
     later_html += f'<p class="note">{escape(_r2_gone_note(data))}</p>' if gone else ""
     s = cc["set"]
@@ -5057,14 +5116,14 @@ def _previews_r2_section(data: dict, board_version: str | None = None) -> str:
 <h3>{escape(cc["title"])} <span class="meta">{escape(cc_meta)}</span></h3>
 <p class="ptask">{escape(cc["task"])}</p>
 <p class="pfinding">{escape(PREVIEW_R2_CC_CAN)} {escape(PREVIEW_R2_CC_CANNOT)}</p>
-{_r2_table(cc["title"], cc_head, cc_rows, _r2_caption(data, board_version))}
+{_pv_disclosure(_r2_table(cc["title"], cc_head, cc_rows, _r2_caption(data, board_version)), cc_hint)}
 {later_html}{f'<p class="note">{escape(_zero_note(cc))}</p>' if _zero_note(cc) else ""}<p class="note">{_r2_order_note(cc)}</p>
 </div>
 <div class="ptrack" id="preview-forecast">
 <h3>{escape(fc["title"])} <span class="meta">{escape(fc_meta)}</span></h3>
 <p class="ptask">{escape(fc["task"])}</p>
 <p class="pfinding">{escape(PREVIEW_R2_FC_CAN)} {escape(PREVIEW_R2_FC_CANNOT)}</p>
-{_r2_table(fc["title"], fc_head, fc_rows, _r2_caption(data, board_version))}
+{_pv_disclosure(_r2_table(fc["title"], fc_head, fc_rows, _r2_caption(data, board_version)), fc_hint)}
 {later_html}<p class="note">{_r2_order_note(pooled)} {escape(live_line)}</p>
 </div>
 </section>"""
@@ -5214,7 +5273,7 @@ significant: its cell shows which way it leans, and a lean does not mean the two
 <p class="deck">Ship Sense scores {_current_count(n_models, n_provisional)}, and earlier releases back to 2024,
 on product judgment: what <b>not</b> to build, what the data can't support, and when to hold a
 call or change it. The cases are real product decisions, every score comes with a 95% interval
-(its margin of error), and no lab's reviewer grades its own models.</p>
+(its margin of error), and the reviewers who read Honesty answers never grade their own lab's models.</p>
 <p class="by">{byline}</p>
 <p class="by vchange">{VERSION_CHANGE_NOTE}</p>
 </div>
@@ -5402,6 +5461,9 @@ _CARD_FOOT_Y = 600
 _CARD_SHORT_GROUP = 5
 _CARD_ROW_PITCH_TALL = 96
 _CARD_TALL_MARK_R, _CARD_TALL_CI_W = 10.0, 7.0
+# The §9d note under the muted rows: line pitch and the descent under its last line, in ems.
+_CARD_NOTE_LEAD = 1.3
+_CARD_NOTE_DESCENT = 0.3
 
 # Right column: the chart, no panel box (the page's convention).
 _CARD_CHART_X = 736
@@ -5651,10 +5713,9 @@ def _card_rows_muted(group: list[dict], note: tuple[str, ...], muted: list[dict]
     separated from it as muted rows, the note lines under them, one scale with at
     least two ticks covering every row shown."""
     rows = list(group) + muted
-    lines = len(rows) + len(note)
     short = len(rows) <= _CARD_SHORT_GROUP
-    pitch, band_bottom, tick_y = _card_band_geom(lines, short)
     st = _card_row_style(short)
+    pitch, band_bottom, tick_y, top = _card_muted_geom(len(rows), len(note), st, short)
     scale = _two_ticks(_card_scale(rows, st.name_px))
 
     out = (f'<rect x="{_CARD_PAD - _CARD_BAND_BLEED}" y="{_CARD_ROWS_TOP}" '
@@ -5669,17 +5730,40 @@ def _card_rows_muted(group: list[dict], note: tuple[str, ...], muted: list[dict]
                              _CARD_MUTED_INK, anchor=_TextAnchor.MIDDLE))
 
     amap = availability()
-    slack = band_bottom - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD - lines * pitch
-    top = _CARD_ROWS_TOP + _CARD_BAND_PAD + slack / 2 + pitch / 2
     for i, r in enumerate(rows):
         tone = _RowTone.MUTED if i >= len(group) else _RowTone.FULL
         out += _card_row(r, top + i * pitch, scale, amap, st, tone)
     # The note lines sit close under the rows, one text line apart, not a row apart.
     y = top + (len(rows) - 0.5) * pitch + CARD_MIN_FONT_PX * (1 + _CARD_MIDLINE)
     for i, text in enumerate(note):
-        out += _card_text(_CARD_PAD, y + i * CARD_MIN_FONT_PX * 1.3, text, CARD_MIN_FONT_PX,
-                          _CARD_MUTED_INK, 600)
+        out += _card_text(_CARD_PAD, y + i * CARD_MIN_FONT_PX * _CARD_NOTE_LEAD, text,
+                          CARD_MIN_FONT_PX, _CARD_MUTED_INK, 600)
     return out
+
+
+def _card_muted_geom(n_rows: int, n_note: int, st: _CardRowStyle,
+                     short: bool) -> tuple[float, float, float, float]:
+    """(row pitch, band bottom, tick baseline, first row's centre) for the §9d
+    state. The note lines take a text line each, not a row, so the rows and the
+    note are centred on the band as one block, from the first row's mark to the
+    last note line: no empty band under the note.
+
+        band top ─┬─ slack / 2
+                  │  ●  first row          (head = the mark's radius)
+                  │  ●  last row  ─┐ pitch / 2
+                  │  note line     ┘ + note_h
+        band end ─┴─ slack / 2
+    """
+    note_h = CARD_MIN_FONT_PX * (_CARD_MIDLINE + 1 + _CARD_NOTE_LEAD * (n_note - 1)
+                                 + _CARD_NOTE_DESCENT)
+    pitch, band_bottom, tick_y = _card_band_geom(n_rows + n_note, short)
+    room = band_bottom - _CARD_ROWS_TOP - 2 * _CARD_BAND_PAD
+    head = st.mark_r
+    if short:
+        pitch = min(_CARD_ROW_PITCH_TALL, (room - head - note_h) / (n_rows - 0.5))
+    block = head + (n_rows - 0.5) * pitch + note_h
+    slack = max(0.0, room - block)
+    return pitch, band_bottom, tick_y, _CARD_ROWS_TOP + _CARD_BAND_PAD + slack / 2 + head
 
 
 def _pitch_split(pitch: str, room: float) -> tuple[str, str]:
@@ -6253,6 +6337,28 @@ def write_pages(ledger: dict) -> None:
     inject_previews_readme(load_previews(), body=current_previews_md())
 
 
+# A board archived under docs/history/<version>/ keeps its page as published,
+# plus one banner under <body> so a reader who lands there does not take it for
+# the current board. Older archives stay exactly as they were published.
+ARCHIVE_BANNER = ('<div class="archived" role="note"><div class="wrap"><b>Archived:</b> the '
+                  '{version} board, kept as published. It is superseded by {successor}. '
+                  '<a href="{url}">See the current board</a>.</div></div>')
+_ARCHIVE_MARK = '<div class="archived"'
+_BODY_OPEN = "<body>\n"
+
+
+def archive_banner(html: str, version: str, successor: str) -> str:
+    """The page with the archive banner inserted right after <body>. Refuses a
+    page that already carries one, or that has no <body> to put it under."""
+    if _ARCHIVE_MARK in html:
+        raise ValueError(f"the {version} page already carries an archive banner")
+    if _BODY_OPEN not in html:
+        raise ValueError("no <body> to put the archive banner under")
+    banner = ARCHIVE_BANNER.format(version=escape(version), successor=escape(successor),
+                                   url=SITE_URL)
+    return html.replace(_BODY_OPEN, f"{_BODY_OPEN}{banner}\n", 1)
+
+
 # --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
@@ -6277,7 +6383,17 @@ def main():
     ap.add_argument("--version-note", default=None,
                     help="One line describing what changed in this version "
                          "(shown in the score-history tables).")
+    ap.add_argument("--archive-banner", nargs=3, metavar=("PAGE", "VERSION", "SUCCESSOR"),
+                    help="add the archive banner to an archived page in place, e.g. "
+                         "docs/history/v4.9/docs/index.html v4.9 v4.10")
     args = ap.parse_args()
+
+    if args.archive_banner:
+        page, version, successor = args.archive_banner
+        path = Path(page)
+        path.write_text(archive_banner(path.read_text(), version, successor))
+        print(f"Archive banner added to {path}")
+        return
 
     if args.render_only:
         write_pages(load_ledger(Path(args.ledger)))

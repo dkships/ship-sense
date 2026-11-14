@@ -1595,6 +1595,47 @@ def _text_extent(svg: str, text: str) -> tuple[float, float, float]:
     return right - len(text) * size * _CHART_DIGIT_EM, right, float(m.group(2))
 
 
+_PHONE_VIEW_W = 360
+_FLAG_PX = 14
+
+
+def _flag_clear(flag_x: float, flag_y: float, score_left: float, score_y: float) -> bool:
+    """A ▲ is clear of a score when it ends before the score starts on the same
+    line, or sits a whole text line away; either way it stays inside the drawing."""
+    flag_right = flag_x + _FLAG_PX * _CHART_DIGIT_EM
+    inside = flag_right <= _PHONE_VIEW_W
+    if abs(flag_y - score_y) >= _FLAG_PX:
+        return inside
+    return inside and flag_right + 2 <= score_left
+
+
+def test_phone_charts_give_the_plot_most_of_the_width():
+    """On a 390 px phone the name column left the leaderboard plot about a third
+    of the width and the open-weight plot about 60 px. On a phone the name sits
+    on its own line above the interval, so the plot spans the drawing."""
+    rows = _ranked_with_top(6, 3)
+    rows[0]["label"] = "Mistral Large 4 (Oct 29)"
+    labels = [r["label"] for r in rows]
+    for g in (lb._field_geom(lb._FieldLayout.NARROW, labels, lb._ExtraColumn.NONE),
+              lb._weights_geom(lb._FieldLayout.NARROW, labels)):
+        assert g.plot_right - g.plot_left >= 0.85 * _PHONE_VIEW_W
+    svg = lb._score_field_svg(rows, lb._FieldLayout.NARROW)
+    row = svg.split('<g class="frow"><title>')[1].split("</g>")[0]
+    label_y = float(re.search(r'y="([\d.]+)" text-anchor="start" class="flabel"', row).group(1))
+    whisker_y = float(re.search(r'<line x1="[\d.]+" y1="([\d.]+)"', row).group(1))
+    score_y = _text_extent(row, f'{rows[0]["score"]["value"]:.1f}')[2]
+    assert label_y == score_y and whisker_y - label_y >= _FLAG_PX * 0.75
+
+
+def test_phone_charts_keep_the_pre_release_tag():
+    """With the name on its own line there is room for the vendor's tag."""
+    m = _fake_model("mistral-large-4-1029", "Mistral Large 4 (Oct 29)", "mistral", 85.0)
+    row = lb._field_row(m, 0, lb._field_geom(lb._FieldLayout.NARROW, [m["label"]],
+                                            lb._ExtraColumn.NONE),
+                        lambda v: v, lb._FieldLayout.NARROW, tag=lb._avail_tspan("preview"))
+    assert '<tspan class="favail" dx="6">preview</tspan>' in row
+
+
 def test_phone_weights_chart_keeps_score_rank_and_marks_apart():
     """The weights chart's phone drawing printed "92.8" over "1-10" (read as
     "92.81-10"), put the ▲ on the score, and the column head on the 100 tick."""
@@ -1618,10 +1659,10 @@ def test_phone_weights_chart_keeps_score_rank_and_marks_apart():
         score_left, score_right, y = _text_extent(row, f'{r["score"]["value"]:.1f}')
         rank_left, _, y_rank = _text_extent(row, lb._rank_range(r))
         assert y == y_rank and score_right + gap <= rank_left, r["label"]
-        # A ▲ ends before the score it sits beside starts.
-        flag = re.search(r'<text x="([\d.]+)" y="[\d.]+" class="fnum">&#9650;</text>', row)
+        # A ▲ sits on the interval's line, clear of the score's line, inside the drawing.
+        flag = re.search(r'<text x="([\d.]+)" y="([\d.]+)" class="fnum">&#9650;</text>', row)
         if flag:
-            assert float(flag.group(1)) + 14 * _CHART_DIGIT_EM + 2 <= score_left, r["label"]
+            assert _flag_clear(float(flag.group(1)), float(flag.group(2)), score_left, y), r["label"]
     assert svg.count("&#9650;") == 2
     # The column head sits on the unit line, not on the tick row.
     head = re.search(r'<text x="[\d.]+" y="([\d.]+)" text-anchor="end" class="ftick">'
@@ -1645,9 +1686,9 @@ def test_phone_weights_flag_clears_a_score_near_the_top():
                 "winner_exploratory": "c-0"}]
     svg = lb._weights_svg(open_rows, closed_rows, records, lb._FieldLayout.NARROW)
     row = svg.split('<g class="frow"><title>Top — ')[1].split("</g>")[0]
-    score_left, _, _ = _text_extent(row, "97.0")
-    flag = re.search(r'<text x="([\d.]+)" y="[\d.]+" class="fnum">&#9650;</text>', row)
-    assert float(flag.group(1)) + 14 * _CHART_DIGIT_EM + 4 <= score_left
+    score_left, _, score_y = _text_extent(row, "97.0")
+    flag = re.search(r'<text x="([\d.]+)" y="([\d.]+)" class="fnum">&#9650;</text>', row)
+    assert _flag_clear(float(flag.group(1)), float(flag.group(2)), score_left, score_y)
 
 
 def test_phone_board_keeps_the_version_tag_on_one_line():
@@ -1995,3 +2036,45 @@ def test_version_change_note_quotes_the_ledger_fall_range():
 def test_honesty_card_targets_missed_caveats():
     honesty = next(d for d in lb.DIM_DEFS if d["key"] == "honesty")
     assert honesty["targets"] == "missed caveats"
+
+
+def test_card_note_under_the_muted_rows_leaves_no_empty_band():
+    """The v4.9 card set its one note line a text line under the second row and left
+    a blank band about 80 px tall beneath it. The rows and their note sit as one
+    block centred on the band, so the air above and below matches."""
+    ranked = _ranked_sole_first(others_reach_one=1)
+    group, _ = lb._card_top_group(ranked)
+    muted, note = lb._not_separated_rows(lb._sole_first(ranked)[1])
+    svg = lb._card_rows(group, note, muted)
+    band = re.search(r'<rect x="[\d.-]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)"', svg)
+    band_top, band_bottom = float(band.group(1)), float(band.group(1)) + float(band.group(2))
+    names = [float(y) for y in re.findall(r'<text x="64.0" y="([\d.]+)"[^>]*font-weight="500"', svg)]
+    note_y = float(re.search(r'<text x="64.0" y="([\d.]+)"[^>]*font-weight="600"[^>]*>'
+                             + re.escape(escape(note[-1])), svg).group(1))
+    above = min(names) - lb._CARD_CHART_TITLE_PX - band_top
+    below = band_bottom - note_y
+    assert abs(above - below) <= lb.CARD_MIN_FONT_PX
+
+
+def test_phone_hero_headline_is_set_a_step_smaller():
+    """At 390 px the §9d headline ran to six lines at the desktop clamp's 34 px
+    floor. A phone sets it a step smaller; the words are unchanged."""
+    phone = lb.CSS.replace("\n", "").split("@media(max-width:760px){")[1]
+    assert "h1{font-size:1.75rem;" in phone
+
+
+def test_an_archived_page_says_so_at_the_top():
+    """A reader landing on docs/history/<v>/docs/index.html saw an old board as
+    current. A page archived from now on carries a banner under <body> naming its
+    version, what superseded it and where the current board is; nothing else moves."""
+    ledger = {"runs": [_fake_run("2026-07-10", "ab" * 32,
+                                 [_fake_model("a", "A", "openai", 90.0)], version="v4.9")]}
+    page = lb.render_html(ledger)
+    archived = lb.archive_banner(page, "v4.9", "v4.10")
+    banner = archived.split("<body>\n", 1)[1].split("\n", 1)[0]
+    assert banner.startswith('<div class="archived" role="note">')
+    assert "v4.9" in banner and "v4.10" in banner and lb.SITE_URL in banner
+    assert archived.replace(banner + "\n", "", 1) == page
+    with pytest.raises(ValueError):
+        lb.archive_banner(archived, "v4.9", "v4.10")
+    assert ".archived{" in lb.CSS

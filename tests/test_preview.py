@@ -286,7 +286,7 @@ def test_stray_closing_brace_is_unreadable_not_the_cap():
     # invalid forecast put a complete forecast at the cap. It is now ungraded.
     case = _two_question_case()
     raw = json.dumps(FULL) + "}"
-    assert grade.parse_json(raw)["forecasts"]["q2"].get("high") is None   # the lossy repair
+    assert grade.parse_json(raw, grade.Reader.V4_9)["forecasts"]["q2"].get("high") is None   # the lossy repair
     assert preview_grade.grade_forecast(case, raw, 0) is None
 
 

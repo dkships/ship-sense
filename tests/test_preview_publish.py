@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 
 from src import leaderboard as lb
 from src import preview, preview_publish, preview_run
@@ -266,6 +267,71 @@ def test_privacy_scan_probes_every_claim_question_and_brief():
             assert entry["text"] in texts
 
 
+# --- The leak scan reads every official set, or refuses ------------------------------------------
+# In a checkout without the private cases the scan loaded nothing and passed (v4.9's build
+# worktree), and the round-two sets were never read by it at all.
+def _examples(track: Track) -> list[dict]:
+    return [yaml.safe_load(p.read_text())
+            for p in sorted((preview.PREVIEWS_DIR / track.value).glob("example_*.yaml"))]
+
+
+def _official_set(root: Path, track: Track, folder: str | None = None) -> list[str]:
+    """One set folder holding the committed examples under made-up official ids."""
+    folder = folder or track.value
+    (root / folder).mkdir(parents=True, exist_ok=True)
+    ids = []
+    for record in _examples(track):
+        record["id"] = record["id"].removeprefix(preview.EXAMPLE_PREFIX) + "_made_up"
+        (root / folder / f"{record['id']}.yaml").write_text(yaml.safe_dump(record))
+        ids.append(record["id"])
+    return ids
+
+
+def test_leak_scan_reads_every_listed_set(tmp_path):
+    first = _official_set(tmp_path / "a", Track.CLAIMCHECK)
+    second = _official_set(tmp_path / "b", Track.FORECAST)
+    sets = ((tmp_path / "a", Track.CLAIMCHECK.value, Track.CLAIMCHECK),
+            (tmp_path / "b", Track.FORECAST.value, Track.FORECAST))
+    assert sorted(c.id for c in preview_publish.scan_cases(sets)) == sorted(first + second)
+
+
+def test_leak_scan_refuses_a_set_with_no_official_case(tmp_path):
+    folder = tmp_path / Track.CLAIMCHECK.value
+    folder.mkdir()
+    for record in _examples(Track.CLAIMCHECK):
+        (folder / f"{record['id']}.yaml").write_text(yaml.safe_dump(record))
+
+    examples_only = ((tmp_path, Track.CLAIMCHECK.value, Track.CLAIMCHECK),)
+    with pytest.raises(preview_publish.NothingScanned):
+        preview_publish.scan_cases(examples_only)
+
+    absent = ((tmp_path / "absent", Track.FORECAST.value, Track.FORECAST),)
+    with pytest.raises(preview_publish.NothingScanned):
+        preview_publish.scan_cases(absent)
+
+
+def test_leak_scan_lists_both_rounds():
+    listed = {(Path(root).name, folder) for root, folder, _ in preview_publish.SCAN_SETS}
+    assert listed == {("previews", "claimcheck"), ("previews", "forecast"),
+                      ("round2", "claimcheck"), ("round2", "forecast"),
+                      ("round2", "forecast-live")}
+
+
+def test_leak_scan_finds_case_text_in_a_tracked_file(tmp_path):
+    # The made-up cases carry the committed examples' text, and those files are tracked.
+    _official_set(tmp_path, Track.CLAIMCHECK)
+    sets = ((tmp_path, Track.CLAIMCHECK.value, Track.CLAIMCHECK),)
+    hits = preview_publish.scan_tracked(sets)
+    assert any(name.startswith("previews/claimcheck/example_") for name in hits)
+
+
+def test_scan_command_fails_when_it_read_nothing(tmp_path, monkeypatch, capsys):
+    empty = ((tmp_path, Track.CLAIMCHECK.value, Track.CLAIMCHECK),)
+    monkeypatch.setattr(preview_publish, "SCAN_SETS", empty)
+    assert preview_publish.main(["--scan-tracked"]) == 1
+    assert "nothing was scanned" in capsys.readouterr().out
+
+
 # --- A provisional headline row is in the preview lineup (NEXT_VERSION 10h) ----------------------
 def test_lineup_keeps_a_provisional_current_model_last_and_flagged(tmp_path):
     def row(name, score, ranked=True):
@@ -347,3 +413,27 @@ def test_reliability_note_says_which_cases_it_covers():
     assert "on the 19 cases every model has a readable answer for" in lb.render_previews_md(data)
     track["reliability"]["cases"] = 20
     assert "readable answer for" not in lb._previews_section(data)
+
+
+def test_round_one_tables_open_on_demand_under_their_findings():
+    """The per-model tables sit in disclosures so the findings above them stay in
+    view; the summary says what opens, and the table needs no script to show."""
+    html = lb._previews_section(_synthetic())
+    assert html.count('<details class="gdetail pdetail">') == 2
+    for block in html.split('<div class="ptrack"')[1:]:
+        assert block.index('class="pfinding"') < block.index("<details")
+        opened = block.split("<details", 1)[1].split("</details>", 1)[0]
+        assert "<summary>" in opened and '<table class="ptable">' in opened
+        assert "<script" not in block
+    assert "4 models and 4 baselines" in html and "4 models and 3 baselines" in html
+
+
+def test_round_one_baseline_rows_do_not_look_like_models():
+    """A floor or baseline row wears a hollow mark and no lab ink, under its own
+    label, so 0.157 is not read as one more model."""
+    html = lb._previews_section(_synthetic())
+    floor = html.split('<tr class="pbase">', 1)[1]
+    assert '<span class="dot pfloor"></span>' in floor
+    assert "style=\"background:var(--muted)\"" not in floor
+    css = lb.CSS.replace("\n", "")
+    assert "#previews .dot.pfloor{" in css

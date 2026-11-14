@@ -311,8 +311,9 @@ def gates_report(entries: dict, items: list[dict]) -> dict:
     the null answer check. The null answer's panel credit is reported as a known
     negative; the Honesty baseline itself stays deterministic."""
     report = adversarial.run_gates(items, rescore=panel_grade.gate_rescorer(entries))
-    null_checks = [(e["votes"][lm], None) for e in entries.values()
-                   if _model_of(e.get("key", "")) == panel_batch.NULL_POLICY
+    # A frozen entry is stored under its key and does not carry it.
+    null_checks = [(e["votes"][lm], None) for key, e in entries.items()
+                   if _model_of(e.get("key", key)) == panel_batch.NULL_POLICY
                    for lm in e["landmines"]]
     return {
         "honesty": report["scores"][HONESTY], "honesty_gate": report["gates"][HONESTY],
