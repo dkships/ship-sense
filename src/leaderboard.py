@@ -4398,6 +4398,13 @@ VERSION_CHANGE_NOTE = (
     f'<a href="{REPO_URL}/blob/main/RELEASES.md">RELEASES</a> and '
     f'<a href="{REPO_URL}/blob/main/CORRECTIONS.md">CORRECTIONS</a>.')
 
+# The hero's one-line disclosure, under the byline. Version copy, like
+# VERSION_CHANGE_NOTE: a test holds the model it names to the ledger's first.
+HERO_DISCLOSURE = (
+    "Built mostly by AI agents led by Claude Fable 5.2, the model ranked first. "
+    "v4.10's key changes were judged by the models ranked second to fourth: see "
+    '<a href="#limits">the limits</a>.')
+
 # The writer's headline, kept as the kicker over the finding.
 HERO_KICKER = "Which AI models know when to stop"
 HERO_BYLINE = "By {author} · {version} · run {date} · {bank}"
@@ -5275,7 +5282,7 @@ on product judgment: what <b>not</b> to build, what the data can't support, and 
 call or change it. The cases are real product decisions, every score comes with a 95% interval
 (its margin of error), and the reviewers who read Honesty answers never grade their own lab's models.</p>
 <p class="by">{byline}</p>
-<p class="by vchange">{VERSION_CHANGE_NOTE}</p>
+<p class="by">{HERO_DISCLOSURE}</p>
 </div>
 <figure class="heromini">{_hero_progress(runs, models, previous)}</figure>
 </div>
@@ -5329,7 +5336,7 @@ skill scores, so a skill with more cases can't dominate. It is reported with a 9
 
 <section id="limits">
 <h2>How to read it &middot; limits</h2>
-<div class="panel"><ul>{limitations}</ul></div>
+<div class="panel"><ul><li>{VERSION_CHANGE_NOTE}</li>{limitations}</ul></div>
 </section>
 
 {pairwise_section}
@@ -6259,11 +6266,28 @@ def render_markdown(ledger: dict) -> str:
                  "missing; unreadable or missing responses stay ungraded) · "
                  f"$/M = current list price per 1M input/output tokens, not the cost of an answer"
                  f"{repriced_note}{avail_note}{gens_note}.</sub>")
-    lines += _generations_markdown(gen_pairs)
+    lines += _folded(README_FOLD_GENERATIONS, _generations_markdown(gen_pairs))
     lines += _progress_markdown(runs, models, previous)
     # Secondary view, after the master table and its generations.
-    lines += _weights_markdown(ranked, pairwise)
-    return "\n".join(lines) + "\n" + _history_markdown(runs)
+    lines += _folded(README_FOLD_WEIGHTS, _weights_markdown(ranked, pairwise))
+    lines += _folded(README_FOLD_HISTORY, _history_markdown(runs).split("\n"))
+    return "\n".join(lines)
+
+
+# The README is the repo's front page, so its secondary views fold away under a
+# summary line. The board and the progress chart stay open.
+README_FOLD_GENERATIONS = "Did each new model beat the one it replaced?"
+README_FOLD_WEIGHTS = "Open-weight and closed models"
+README_FOLD_HISTORY = "Score history: every version since the first board"
+
+
+def _folded(summary: str, block: list[str]) -> list[str]:
+    """A README section under a click-to-open summary. An empty section stays
+    out. GitHub renders the markdown inside only when a blank line follows the
+    summary, and every block here opens with one."""
+    if not block:
+        return []
+    return ["", "<details>", f"<summary><b>{summary}</b></summary>", *block, "", "</details>"]
 
 
 def _history_markdown(runs: list[dict]) -> str:

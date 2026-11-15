@@ -916,6 +916,60 @@ def test_board_surfaces_split_generations_but_history_does_not():
     assert "| Old Flagship (91.0) " in md.split("### Score history")[1]
 
 
+def test_readme_folds_the_secondary_views():
+    """The README is the repo's front page: the board and the progress chart stay
+    open, and the generations table, the open-weight view and the run history
+    each sit under a click-to-open summary so the page is not a wall of tables."""
+    prev = dict(_fake_model("old-1", "Old Flagship", "openai", 91.0),
+                superseded_by="new-1")
+    curr = _fake_model("new-1", "New Flagship", "openai", 84.0)
+    other = _fake_model("m-2", "Bystander", "google", 70.0)
+    md = lb.render_markdown({"schema_version": 3, "eval": "ship-sense",
+                             "runs": [_fake_run("2026-07-10", "ab" * 32, [prev, curr, other])]})
+    board = md.index("**New Flagship**")
+    first_fold = md.index("<details>")
+    assert board < first_fold
+    for summary, heading in ((lb.README_FOLD_GENERATIONS, "### Current vs. previous generations"),
+                             (lb.README_FOLD_HISTORY, "### Score history")):
+        fold = md.index(f"<summary><b>{summary}</b></summary>")
+        # A blank line after the summary, or GitHub prints the markdown as text.
+        assert md[fold:].split("\n")[1] == ""
+        assert fold < md.index(heading) < md.index("</details>", fold)
+    assert md.count("<details>") == md.count("</details>")
+
+
+def test_readme_fold_leaves_an_empty_section_out():
+    assert lb._folded("Anything", []) == []
+
+
+def test_page_keeps_version_notes_out_of_the_hero():
+    """The hero carries the finding and the byline. What a version changed is
+    release detail: it sits with the limits, one click from the top."""
+    html = lb.render_html(lb.load_ledger(lb.LEDGER))
+    hero = html[html.index('<header class="hero">'):html.index("</header>")]
+    limits = html[html.index('<section id="limits">'):]
+    limits = limits[:limits.index("</section>")]
+    assert "What changed in" not in hero
+    assert lb.VERSION_CHANGE_NOTE in limits
+
+
+def test_hero_says_who_built_it_and_who_ranks_first():
+    """The hero's trust line cannot stand alone: the lead agent is the model
+    ranked first, and the hero says so in one sentence that points to the
+    limits. HERO_DISCLOSURE is version copy, so the model it names must be the
+    ledger's current first."""
+    ledger = lb.load_ledger(lb.LEDGER)
+    html = lb.render_html(ledger)
+    hero = html[html.index('<header class="hero">'):html.index("</header>")]
+    assert lb.HERO_DISCLOSURE in hero
+    assert 'href="#limits"' in lb.HERO_DISCLOSURE
+    run = ledger["runs"][-1]
+    current = [m for m in run["models"] if not m["is_baseline"] and not m.get("superseded_by")
+               and not m.get("replaced_by")]
+    first = max(current, key=lambda m: m["score"]["value"])
+    assert f'{first["label"]}, the model ranked first' in lb.HERO_DISCLOSURE
+
+
 def _dim_pair(prev_dims, curr_dims):
     """A minimal succession whose two sides carry real 0–1 dimension scores."""
     def sided(name, label, score, dims):
