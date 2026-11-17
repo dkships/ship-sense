@@ -893,6 +893,74 @@ def test_each_decisive_succession_names_its_own_test():
     assert "BH" in lb._GENS_CAPTION and "Holm" in lb._GENS_CAPTION
 
 
+def test_the_longest_verdict_fits_the_generations_chart():
+    """GPT-6.1 Sol -> GPT-6.2 Sol was the first registered decisive downgrade on
+    the README chart, and "decisive downgrade · registered" ran past the right
+    edge: the chart printed "registere"."""
+    prev = dict(_fake_model("old-1", "Old 1", "openai", 92.6), superseded_by="new-1")
+    curr = _fake_model("new-1", "New 1", "openai", 90.6)
+    rec = {"a": "new-1", "b": "old-1", "delta": -0.02, "lo": -0.039, "hi": -0.001,
+           "n_items": 100, "winner": "old-1", "p_value": 0.034, "holm_p": 0.034,
+           "q_value": 0.044, "family": "confirmatory"}
+    p = lb._generation_pairs([prev, curr], [prev], [rec])[0]
+    assert lb._verdict_call(p) == "▼ decisive downgrade"
+    svg = lb._generations_svg([dict(p, bench="v2.0")])
+    width = float(re.search(r'viewBox="0 0 (\d+) ', svg).group(1))
+    start = float(re.search(r'<text x="(\d+)" y="[\d.]+" class="fverd">', svg).group(1))
+    printed = "▼ decisive downgrade · registered"
+    assert start + len(printed) * lb._GENS_VERDICT_CHAR_W <= width
+
+
+def _registered_downgrade():
+    prev = dict(_fake_model("old-1", "Old 1", "openai", 92.6), superseded_by="new-1")
+    curr = _fake_model("new-1", "New 1", "openai", 90.6)
+    rec = {"a": "new-1", "b": "old-1", "delta": -0.02, "lo": -0.039, "hi": -0.001,
+           "n_items": 100, "winner": "old-1", "p_value": 0.034, "holm_p": 0.034,
+           "q_value": 0.044, "family": "confirmatory"}
+    return dict(lb._generation_pairs([prev, curr], [prev], [rec])[0], bench="v2.0")
+
+
+def test_a_row_the_word_match_grader_disputes_says_so(monkeypatch):
+    """GPT-6.1 Sol -> GPT-6.2 Sol printed "decisive downgrade" on the page and in
+    the README with no sign that the word-match grader does not find it, while
+    the hand-written docs gave both graders every time."""
+    p = _registered_downgrade()
+    monkeypatch.setattr(lb, "GRADER_SPLIT", {("old-1", "new-1"): "panel only"})
+    assert "panel only" in lb._matchup_card(p)
+    md = "\n".join(lb._generations_markdown([p]))
+    assert "**decisive downgrade** (panel only)" in md
+    assert lb.GRADER_SPLIT_NOTE in md
+    assert escape(lb.GRADER_SPLIT_NOTE) in lb._grader_split_html([p])
+
+    monkeypatch.setattr(lb, "GRADER_SPLIT", {})
+    assert "panel only" not in lb._matchup_card(p)
+    md = "\n".join(lb._generations_markdown([p]))
+    assert "panel only" not in md and lb.GRADER_SPLIT_NOTE not in md
+    assert lb._grader_split_html([p]) == ""
+
+
+def test_the_disputed_rows_match_both_graders_records():
+    """The page never reads the word-match grader's records, so the list of rows
+    it marks is checked against them wherever both pairwise files are on disk
+    (not on a public clone, which has only the panel's)."""
+    run_id = json.loads((lb.ROOT / "leaderboard.json").read_text())["runs"][-1]["run_id"]
+    panel_path = lb.ROOT / "outputs" / run_id / "pairwise.json"
+    alias_path = lb.ROOT / "outputs" / f"{run_id}-alias" / "pairwise.json"
+    if not (panel_path.exists() and alias_path.exists()):
+        pytest.skip("both graders' pairwise records are not on disk")
+    alias = {frozenset((c["a"], c["b"])): c
+             for c in json.loads(alias_path.read_text())["comparisons"]}
+    disputed = set()
+    for c in json.loads(panel_path.read_text())["comparisons"]:
+        hypothesis = c.get("hypothesis") or {}
+        if c.get("family") != "confirmatory" or hypothesis.get("reason") != "succession":
+            continue
+        other = alias[frozenset((c["a"], c["b"]))]
+        if (c["holm_p"] <= 0.05) != (other["holm_p"] <= 0.05):
+            disputed.add((hypothesis["prev"], hypothesis["curr"]))
+    assert set(lb.GRADER_SPLIT) == disputed
+
+
 def test_board_surfaces_split_generations_but_history_does_not():
     prev = dict(_fake_model("old-1", "Old Flagship", "openai", 91.0),
                 superseded_by="new-1")
