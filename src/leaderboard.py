@@ -3115,6 +3115,10 @@ _GENS_TAIL_ROOM = 4
 # Appended to a registered succession's verdict on the README chart: its test
 # is Holm within the confirmatory family, not the exploratory BH q-value.
 _GENS_REGISTERED = " &#183; registered"
+# Width one character of the verdict line takes at its 13px size, rounded up, so
+# the longest verdict ("decisive downgrade · registered") is checked against the
+# chart's right edge and not clipped.
+_GENS_VERDICT_CHAR_W = 6.6
 
 
 def _generations_svg(pairs: list[dict]) -> str:
@@ -3133,8 +3137,9 @@ def _generations_svg(pairs: list[dict]) -> str:
     # mark (about 30 units, ~3 points), so it never touches the row's label.
     x0 = 5 * math.floor((min(values) - _GENS_TAIL_ROOM) / 5)
     x1 = 5 * math.ceil((max(values) + 1) / 5)
-    # Names "Gemini 3.1 Flash-Lite → Gemini 3.5 Flash-Lite" need ~320 units.
-    left, right, vw = 344, 214, 960
+    # Names "Gemini 3.1 Flash-Lite → Gemini 3.5 Flash-Lite" need ~320 units; the
+    # verdict column on the right holds "▼ decisive downgrade · registered".
+    left, right, vw = 344, 236, 960
     plot_w = vw - left - right
     row_h, top = 46, 38
     h = top + len(rows) * row_h + 10
@@ -3357,6 +3362,34 @@ def _earlier_note(earlier: list[dict], link: str) -> str:
             f"{p['bench']} board are in its {link}.")
 
 
+# Registered successions on which the reviewer panel and the word-match grader
+# reach different verdicts: (previous, current) -> the words the row adds beside
+# its verdict. Version copy like VERSION_CHANGE_NOTE: the page and the README
+# never read the word-match grader's records, so a test holds this list to both
+# graders' pairwise files wherever they are on disk. Re-derive it at every add.
+GRADER_SPLIT = {
+    ("gpt-6.1-sol", "gpt-6.2-sol"): "panel only",
+    ("gpt-6-sol", "gpt-6.1-sol"): "panel only",
+    ("kimi-k3", "kimi-k3.1-pro"): "word-match grader: decisive downgrade",
+}
+GRADER_SPLIT_NOTE = ("A verdict here is the reviewer panel's, the board's grader. Where a "
+                     "row adds \"panel only\" or a word-match verdict, the older word-match "
+                     "grader reaches a different verdict on that registered test. Both "
+                     "graders' figures for every registered test are in FINDINGS.")
+
+
+def _grader_split(p: dict) -> str:
+    """What a row adds beside its verdict when the two graders disagree, or ""."""
+    return GRADER_SPLIT.get((p["prev"]["name"], p["curr"]["name"]), "")
+
+
+def _grader_split_html(pairs: list[dict]) -> str:
+    """The page's note under the generation cards, when any row is marked."""
+    if not any(_grader_split(p) for p in pairs):
+        return ""
+    return f'<p class="note">{escape(GRADER_SPLIT_NOTE)}</p>'
+
+
 def _card_note(p: dict) -> str:
     """The card's confidence line, which says only what the pill above it can't.
 
@@ -3414,9 +3447,11 @@ def _matchup_card(p: dict, off_board: dict[str, _GenTag] | None = None) -> str:
                 f'<span class="vtag">{tag}</span>'
                 f'<span class="vscore">{m["score"]["value"]:.1f}</span></div>')
     note = _card_note(p)
+    split = _grader_split(p)
     delta_line = ("&#916; not paired" if p["delta"] is None
                   else f'&#916; <b>{_pair_delta_text(p)}</b>'
-                  + (f' &middot; {note}' if note else ""))
+                  + (f' &middot; {note}' if note else "")
+                  + (f' &middot; {escape(split)}' if split else ""))
     return (f'<div class="gcard" style="--gink:{ink}">'
             f'<div class="gtop"><span class="pill {pill_cls}">{pill}</span>{tested}</div>'
             f'{vrow(curr, curr_tag.value, "gsucc")}'
@@ -3472,6 +3507,8 @@ def _generations_section(pairs: list[dict], bank_n: int | None,
                   f'<span class="dhint">both models have since left the board; same '
                   f'bench, same paired tests</span></summary>'
                   + _card_grid(history, off_board) + '</details>')
+    # One note for every card above it, on the board or in the earlier group.
+    cards += _grader_split_html(latest)
     rows = "".join(_succession_rows(p, by_name, bank_n, off_board) for p in latest)
     if earlier:
         bench = escape(earlier[0]["bench"])
@@ -3549,6 +3586,8 @@ def _generations_markdown(pairs: list[dict]) -> list[str]:
         verdict = (f"{glyph} **{label}**" if p["decisive"] else
                    f"{glyph} {label}" + (f" — {_qualifier(p)}" if _qualifier(p) else "")
                    + (f"; {_bound_text(p)}" if _bound_text(p) else ""))
+        if _grader_split(p):
+            verdict += f" ({_grader_split(p)})"
         lines.append(
             f"| {p.get('bench') or '—'} "
             f"| {prev['label']}{_avail_md(amap.get(prev['name']))} — {prev['score']['value']:.1f} "
@@ -3570,6 +3609,8 @@ def _generations_markdown(pairs: list[dict]) -> list[str]:
               "do not test it — only the paired Δ is tested. Full rows for both sides of every "
               "succession are on the "
               "[live leaderboard](https://dkships.github.io/ship-sense/#generations).</sub>"]
+    if any(_grader_split(p) for p in pairs):
+        lines += ["", f"<sub>{GRADER_SPLIT_NOTE}</sub>"]
     _, earlier = _bench_groups(pairs)
     if earlier:
         bench = earlier[0]["bench"]

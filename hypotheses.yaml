@@ -744,4 +744,28 @@ versions:
         # per byte, a secure-code pass rate), and its figure naming Claude Opus 5.5,
         # GPT-6.1 Sol, GPT-6 Astra and Kimi K3.1 is benchmark rows only: no pair, by the
         # rule used for Fable 5.2, Muse Ember, Carbon and Hydrogen.
+        # Noted 2026-11-17, before GPT-6.2 Astra or GPT-6.2 Sol answered any bank item: NO
+        # claim is registered for either. OpenAI's launch post
+        # (openai.com/index/introducing-gpt-6-2-astra-sol) names board models in general
+        # lines only against its own predecessors: "Compared with GPT-6.1 Sol, GPT-6.2
+        # Sol is smarter, more efficient, and lets you complete more tasks on the same
+        # paid plan." and, on one worked example, "GPT-6.2 Astra's writing is much more
+        # professional and readable than GPT-6 Astra's." Those pairs are the GPT-6.1 Sol
+        # -> GPT-6.2 Sol and GPT-6 Astra -> GPT-6.2 Astra successions, inferred from the
+        # labels and tested once each, each as its own family of one, at shipped
+        # defaults (on 2026-11-17 the API reports medium reasoning effort for all four
+        # when none is sent). Every line that names another lab's model is tied to one benchmark:
+        # Claude Fable 5.2 on Agents' Last Exam ("5.5 points ahead of Claude Fable 5.2 at
+        # just 5% of the cost"), Harvey LAB-AA ("more than doubling Claude Fable 5.2's
+        # pass rate") and AA-3D (an Elo ranking); Claude Opus 5.5 and Gemini 4 Carbon
+        # appear only in a chart legend. Its widest lines name no model ("We believe
+        # GPT-6.2 Astra is the best model in the world for scientists"; "both models come
+        # close to or outperform other leading models at a small fraction of the cost per
+        # task"; "leads the models we tested" on OpenAI's own GDPval v2). No pair, by the
+        # rule used for Fable 5.2, Muse Ember, Carbon, Hydrogen and Qwen 4 Max.
+        # Added 2026-11-17 after both models were scored, on a review of the docs (the
+        # note above is as registered): the post also names Fable 5.2 in a footnote, on
+        # Terminal-Bench-Science 0.1 ("results for Fable 5.2 are as reported by Artificial
+        # Analysis"). That is a fourth benchmark, not three, and it is also tied to one
+        # benchmark, so it registers no pair and the reasoning above is unchanged.
     exploratory: all_pairs

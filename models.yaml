@@ -492,6 +492,78 @@ models:
     batch_discount: 0.5          # pricing page: batch $0.50 / $2.50
     price_verified: "2026-11-09"
     price_source: "https://developers.openai.com/api/docs/pricing"
+  # GPT-6.2 Astra and GPT-6.2 Sol — released and added 2026-11-17
+  # (openai.com/index/introducing-gpt-6-2-astra-sol, "Introducing GPT-6.2 Astra and
+  # Sol"; openai.com's feed stamps it 2026-11-17 17:45 UTC; the API changelog carries
+  # a Nov 17 entry). "Starting today ... Developers can also access gpt-6.2-astra and
+  # gpt-6.2-sol through the OpenAI API": no preview label, no staged rollout, no
+  # dated snapshot id. Both ids are listed on /v1/models for this key and answer
+  # (notes/gpt62-2026-11-17/models_list.out, facts_probe.out); `created` (2026-10-31
+  # and 2026-11-02) is a checkpoint stamp, not the release.
+  # SUCCESSORS, inferred from the labels: "GPT-6.2 Astra" retires "GPT-6 Astra"
+  # ("gpt astra" 6.2 > 6) and "GPT-6.2 Sol" retires "GPT-6.1 Sol" ("gpt sol" 6.2 >
+  # 6.1) once each is fully ranked. OpenAI never says "replaces": the models page
+  # moves GPT-6 Astra and GPT-6.1 Sol from "Flagship models" to "More models", both
+  # stay on sale, and the deprecations page has no row for either. Each succession
+  # is its own family of one. NO CLAIM PAIR: see the note in hypotheses.yaml v4.10.
+  # The lineup is now Astra 6.2 / Sol 6.2 / Terra 6.1 / Luna 6. `gpt-6.2-astra-law`
+  # ("our configuration of GPT-6.2 Astra for lawyers") is a configuration of the
+  # same model, not a tier: not scored.
+  # GPT-6.1 Sol stays the OpenAI reviewer in the Honesty panel (NEXT_VERSION 4d) and
+  # GPT-6 Astra stays in the v4.10 key review's record: leaving the current board
+  # changes neither.
+  # SHIPPED DEFAULTS: the model pages do not state a default reasoning effort. The
+  # API reports `effort: medium` on a call that sets none, for both models and for
+  # both predecessors, GPT-6 Astra and GPT-6.1 Sol, read the same day
+  # (facts_probe.out). `none` is rejected on 6.2. The harness sends no effort.
+  # Model pages: 1.05M context, 128k max output, structured outputs, Chat
+  # Completions, Responses and Batch. Pricing page: Astra $8 / $40, cached $0.40,
+  # batch $4 / $20 (20% under GPT-6 Astra's $10 / $50); Sol $2 / $10, cached $0.10,
+  # batch $1 / $5 (GPT-6.1 Sol's prices). Inputs over 272k tokens bill double in and
+  # 1.5x out; no case comes near. Not introductory: the only dated price is the
+  # Ultrafast tier, which the board does not use.
+  # BATCH: probed 2026-11-17 with one batch per model on /v1/responses and
+  # gpt-6.1-sol as the control; all three cleared validation
+  # (notes/gpt62-2026-11-17/batch_probe.out).
+  # Registered 2026-11-17 before either model saw a bank item.
+  - name: gpt-6.2-astra
+    provider: openai
+    id: gpt-6.2-astra
+    label: "GPT-6.2 Astra"
+    released: "2026-11-17"       # openai.com/index/introducing-gpt-6-2-astra-sol
+    price_in: 8
+    price_out: 40
+    price_cached_in: 0.4
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true     # strict json_schema probed OK 2026-11-17
+    max_tokens: 8192             # rule 1 probe 2026-11-17, live at 128,000 on GPT-6 Astra's five longest
+                                 # cases: peak 1,000 = 12% of 8,192, inside the 70% bar, so the first
+                                 # step stands. Bounds reasoning plus answer
+                                 # (notes/gpt62-2026-11-17/sizing_probe.out)
+    batch_supported: true        # probed 2026-11-17 against the Batch API itself, with a control
+    batch_discount: 0.5          # pricing page: batch $4 / $20
+    price_verified: "2026-11-17"
+    price_source: "https://developers.openai.com/api/docs/pricing"
+  - name: gpt-6.2-sol
+    provider: openai
+    id: gpt-6.2-sol
+    label: "GPT-6.2 Sol"
+    released: "2026-11-17"       # openai.com/index/introducing-gpt-6-2-astra-sol
+    price_in: 2
+    price_out: 10
+    price_cached_in: 0.1
+    api: chat_completions
+    migration_target: responses
+    structured_outputs: true     # strict json_schema probed OK 2026-11-17
+    max_tokens: 8192             # rule 1 probe 2026-11-17, live at 128,000 on GPT-6.1 Sol's five longest
+                                 # cases: peak 1,043 = 13% of 8,192, inside the 70% bar, so the first
+                                 # step stands. Bounds reasoning plus answer
+                                 # (notes/gpt62-2026-11-17/sizing_probe.out)
+    batch_supported: true        # probed 2026-11-17 against the Batch API itself, with a control
+    batch_discount: 0.5          # pricing page: batch $1 / $5
+    price_verified: "2026-11-17"
+    price_source: "https://developers.openai.com/api/docs/pricing"
   - name: gpt-6-luna
     provider: openai
     id: gpt-6-luna
