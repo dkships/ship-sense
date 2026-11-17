@@ -4891,13 +4891,13 @@ PREVIEW_R2_INTERVAL_NOTE = ("Intervals resample organisations, because cases fro
 # sentence under the table. The round's figures stay its own lineup's. No date: the
 # stored answer date is a UTC day and public dates are Pacific, so the dated prose
 # (README, FINDINGS, RELEASES) says when.
-PREVIEW_R2_LATER = "{label} was added after this round and answered the same sets."
+PREVIEW_R2_LATER = "{labels} {verb} added after this round and answered the same sets."
 PREVIEW_R2_LATER_SCOPE = "The reliability and agreement figures are the round's own {n} model{s}."
 PREVIEW_R2_LATER_MARK = "added after this round"
 PREVIEW_R2_LATER_MD = "_(added after this round)_"
 # A round model no longer on the latest board's current lineup: kept in the round's rows,
 # marked, and one sentence under the table.
-PREVIEW_R2_GONE = "{labels} {verb} no longer current, and {pronoun} stays in the table because {pronoun} ran the round."
+PREVIEW_R2_GONE = "{labels} {verb} no longer current, and {pronoun} {stays} in the table because {pronoun} ran the round."
 PREVIEW_R2_GONE_MARK = "no longer current"
 PREVIEW_R2_GONE_MD = "_(no longer current)_"
 PREVIEW_R2_SLOTS = ("PREVIEW_R2_LEDE", "PREVIEW_R2_CC_CAN", "PREVIEW_R2_CC_CANNOT",
@@ -4906,15 +4906,22 @@ PREVIEW_R2_SLOTS = ("PREVIEW_R2_LEDE", "PREVIEW_R2_CC_CAN", "PREVIEW_R2_CC_CANNO
                     "PREVIEW_R2_LATER_MARK", "PREVIEW_R2_GONE", "PREVIEW_R2_GONE_MARK")
 
 
+def _join_labels(labels: list[str]) -> str:
+    """'A', 'A and B', 'A, B and C'."""
+    if len(labels) < 3:
+        return " and ".join(labels)
+    return f"{', '.join(labels[:-1])} and {labels[-1]}"
+
+
 def _r2_later_note(data: dict) -> str:
-    """One plain sentence per later model, then the scope of the round's figures."""
-    later = data.get("added_later") or []
-    if not later:
+    """One plain sentence naming the later models, then the scope of the round's figures."""
+    labels = [m["label"] for m in data.get("added_later") or []]
+    if not labels:
         return ""
-    parts = [PREVIEW_R2_LATER.format(label=m["label"]) for m in later]
+    named = PREVIEW_R2_LATER.format(labels=_join_labels(labels),
+                                    verb="was" if len(labels) == 1 else "were")
     n = len(data["lineup"])
-    parts.append(PREVIEW_R2_LATER_SCOPE.format(n=n, s="" if n == 1 else "s"))
-    return " ".join(parts)
+    return f"{named} {PREVIEW_R2_LATER_SCOPE.format(n=n, s='' if n == 1 else 's')}"
 
 
 def _r2_gone_note(data: dict) -> str:
@@ -4924,8 +4931,9 @@ def _r2_gone_note(data: dict) -> str:
     if not labels:
         return ""
     one = len(labels) == 1
-    return PREVIEW_R2_GONE.format(labels=" and ".join(labels), verb="is" if one else "are",
-                                  pronoun="it" if one else "they")
+    return PREVIEW_R2_GONE.format(labels=_join_labels(labels), verb="is" if one else "are",
+                                  pronoun="it" if one else "they",
+                                  stays="stays" if one else "stay")
 
 
 def load_previews_r2(path: Path | None = None) -> dict | None:
