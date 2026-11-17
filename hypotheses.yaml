@@ -732,4 +732,16 @@ versions:
         # intelligence", names its own predecessor: that pair is the Gemini 3.8 Flash ->
         # Gemini 4 Hydrogen succession (models.yaml `superseded_by`), tested once, as its
         # own family of one, at shipped defaults.
+        # Noted 2026-11-16, before Qwen 4 Max answered any bank item: NO claim is registered
+        # for it. Alibaba's launch post (qwen.ai/blog?id=qwen4-max) and X post name one
+        # board model in a general line, its own predecessor: "Qwen4-Max represents a
+        # significant step up from Qwen3.8-Max, delivering stronger performance across
+        # nearly every capability we evaluated." That pair is the Qwen 3.8 Max -> Qwen 4
+        # Max succession, inferred from the labels and tested once, as its own family of
+        # one, at shipped defaults (Qwen 4 Max's default reasoning effort is high; Qwen
+        # 3.8 Max answered at its default, xhigh). The post's other comparisons are tied to
+        # one benchmark or metric each (Work360, Terminal-Bench 4.0, cost per task, bits
+        # per byte, a secure-code pass rate), and its figure naming Claude Opus 5.5,
+        # GPT-6.1 Sol, GPT-6 Astra and Kimi K3.1 is benchmark rows only: no pair, by the
+        # rule used for Fable 5.2, Muse Ember, Carbon and Hydrogen.
     exploratory: all_pairs

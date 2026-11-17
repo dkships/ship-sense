@@ -306,6 +306,24 @@ def test_later_note_prints_no_utc_answer_date():
     assert "November" not in note and "2026" not in note
 
 
+def test_later_note_names_two_models_in_one_sentence():
+    data = {"lineup": [{"name": "mock-weak"}],
+            "added_later": [{"label": "Mock (strong)"}, {"label": "Mock (late)"}]}
+    note = lb._r2_later_note(data)
+    assert "Mock (strong) and Mock (late) were added after this round" in note
+    assert note.count("answered the same sets") == 1
+
+
+def test_gone_note_agrees_with_two_models():
+    data = {"lineup": [{"name": "a", "label": "Mock (a)"}, {"name": "b", "label": "Mock (b)"}],
+            "no_longer_current": ["a", "b"]}
+    note = lb._r2_gone_note(data)
+    assert note == ("Mock (a) and Mock (b) are no longer current, and they stay in the table "
+                    "because they ran the round.")
+    one = lb._r2_gone_note({"lineup": data["lineup"], "no_longer_current": ["a"]})
+    assert one == "Mock (a) is no longer current, and it stays in the table because it ran the round."
+
+
 def test_scan_finds_private_text():
     assert pub.scan("the brief opens: Revenue rose in May.", ["Revenue rose in May"]) == ["Revenue rose in May"]
 

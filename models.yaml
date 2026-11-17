@@ -1766,7 +1766,58 @@ models:
     # docs will not substitute for. Cost-estimate only; never reaches the board.
     # (Confirmed unchanged: cached_tokens sits INSIDE prompt_tokens -- "This value
     # is part of usage.prompt_tokens" -- so declaring price_cached_in stays safe.)
-    price_verified: "2026-11-09"   # price_in/price_out only; cached still open
+    price_verified: "2026-11-16"   # price_in/price_out only ($2/$6 re-read 2026-11-16); cached still open
+    price_source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+
+  # Qwen4-Max — generally available and added 2026-11-16 (Model Studio changelog,
+  # "2026-11-16 qwen4-max Service deployment scope: International"; @Alibaba_Qwen's
+  # launch post went out 2026-11-16 02:01 UTC; the blog qwen.ai/blog?id=qwen4-max shows
+  # "2026/11/15" in a US-Pacific browser). The Token-Plan-only qwen4-max-preview of
+  # 2026-11-11 was not scored (notes/qwen4-2026-11-11/FACTS.md); this is the
+  # pay-as-you-go id, with no preview label and no dated snapshot id. GET /models did
+  # not list it on launch morning, but it answers on this key
+  # (notes/qwen4-2026-11-16/facts_probe.out): trust the call, not the list.
+  # SUCCESSOR OF qwen3.8-max, inferred from the spaced labels ("Qwen 4 Max" parses to
+  # ("qwen max", (4,)) and retires "Qwen 3.8 Max" once fully ranked). Alibaba never
+  # says "replaces": it says "next-generation flagship", "a significant step up from
+  # Qwen3.8-Max" and "the previous generation (Qwen3.8-Max)"; qwen3.8-max stays on
+  # sale at $2/$6 with no retirement notice. The succession is its own family of one.
+  # NO CLAIM PAIR: see the note in hypotheses.yaml v4.10.
+  # SHIPPED DEFAULTS DIFFER FROM 3.8: reasoning_effort defaults to "high" (values
+  # low / high / xhigh; 3.8 Max defaults to xhigh), thinking_budget 131,072,
+  # preserve_thinking on. The harness sends none of them. `max_tokens` bounds thinking
+  # plus answer together ("starting with qwen4-max-preview / qwen4-max, max_tokens ...
+  # limits the combined tokens for reasoning and the final answer"); the vendor's
+  # ceiling for the two together is 262,144.
+  # BATCH: NOT SUPPORTED -> runs LIVE. Probed 2026-11-16 with controls
+  # (notes/qwen4-2026-11-16/batch_probe.out): "The provided model 'qwen4-max' is not
+  # supported by the Batch API", while qwen-plus and qwen3.8-max validated on the same
+  # call. Use --workers 4 (the qwen3.8-max concurrency note above).
+  # Weights not released; Alibaba promises open weights for smaller Qwen4 models only.
+  # Usage: reasoning sits inside completion_tokens and cached tokens inside
+  # prompt_tokens, as on 3.8. Free quota: 1M tokens, Singapore, 90 days.
+  - name: qwen4-max
+    provider: qwen
+    id: qwen4-max
+    base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    label: "Qwen 4 Max"          # spaced on purpose; the vendor writes "Qwen4-Max" (see qwen3.8-max)
+    released: "2026-11-16"       # Model Studio changelog + launch post (02:01 UTC)
+    price_in: 1.5                # International, one tier (0 to 1M input tokens), not introductory
+    price_out: 4.5               # priced as "Chain of thought + answer"
+    price_cached_in: 0.075       # first-party: "Explicit/implicit cache read $0.075" (pricing page)
+    api: chat_completions
+    structured_outputs: true     # json_schema strict probed OK 2026-11-16
+    stream: true
+    max_tokens: 32768            # rule 4 raise 2026-11-16 17:3x UTC, mid-run: one Honesty generation was cut
+                                 # off unreadable at 8,192 and its one same-cap re-run was cut off again,
+                                 # inside its conclusions; that generation runs once more at 32,768. Was
+                                 # 8,192 from the rule 1 probe (Qwen 3.8 Max's five longest cases, live at
+                                 # 131,072: peak 5,602 = 68%). The other 199 answers keep the 8,192 they
+                                 # were given at. Bounds thinking plus answer
+                                 # (notes/qwen4-2026-11-16/cap_events.json)
+    timeout_s: 900
+    batch_supported: false       # Batch API rejects the id; controls passed (2026-11-16)
+    price_verified: "2026-11-16"
     price_source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
 
   # --- DeepSeek — 8th lab, added 2026-08-13 ---
