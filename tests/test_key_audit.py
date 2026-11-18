@@ -666,6 +666,15 @@ def test_estimate_uses_a_pending_price_at_the_top():
     assert now == (2.0, 10.0) and high == (4.0, 20.0)
 
 
+def test_the_openai_judge_is_gpt_6_2_astra_from_the_next_key_review():
+    """NEXT_VERSION 14b: on November 17, 2026 GPT-6.2 Astra read the v4.10 review's
+    99 first-read requests, caught 19 of the 20 planted keys as GPT-6 Astra did,
+    returned no unreadable reply and cost less per request. Finished reviews keep
+    the judges their own design files name."""
+    assert key_audit.JUDGES == {"anthropic": "claude-opus-5-5", "openai": "gpt-6.2-astra",
+                                "google": "gemini-4-argon"}
+
+
 def test_judges_are_the_registered_batch_models():
     cfgs = key_audit.judges()
     assert {lab: c["id"] for lab, c in cfgs.items()} == key_audit.JUDGES
