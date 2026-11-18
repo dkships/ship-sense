@@ -36,7 +36,11 @@ from . import batch, key_audit_items as items, key_audit_prompts as prompts
 from . import key_audit_rule as rule, panel_batch, providers
 from .key_audit_items import Track
 
-JUDGES = {"anthropic": "claude-opus-5-5", "openai": "gpt-6-astra", "google": "gemini-4-argon"}
+# The judges a NEW key review is built with. The OpenAI judge is GPT-6.2 Astra
+# from November 17, 2026 (NEXT_VERSION 14b). The v4.9 and v4.10 reviews were
+# read by GPT-6 Astra: a finished review is replayed from its own design and
+# manifest files, and only this list's lab names are read on replay.
+JUDGES = {"anthropic": "claude-opus-5-5", "openai": "gpt-6.2-astra", "google": "gemini-4-argon"}
 SEED = 20261110
 QID_PREFIX = "ka"
 AUDIT_DIR = "key-audit"
