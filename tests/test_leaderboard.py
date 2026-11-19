@@ -1038,6 +1038,20 @@ def test_hero_says_who_built_it_and_who_ranks_first():
     assert f'{first["label"]}, the model ranked first' in lb.HERO_DISCLOSURE
 
 
+def test_key_review_judges_named_and_ranks_dated():
+    """v4.10's key-review judges were the models ranked second to fourth at
+    v4.10's release (November 14), not on the board as it stands: later adds
+    can move them. So both version-copy slots name the three judges and date
+    that ranking instead of stating it in the present tense."""
+    judges = ("Claude Opus 5.5", "GPT-6 Astra", "Gemini 4 Argon")
+    dated = "ranked second to fourth when v4.10 was released"
+    for slot in (lb.HERO_DISCLOSURE, lb.VERSION_CHANGE_NOTE):
+        for judge in judges:
+            assert judge in slot
+        assert dated in slot
+        assert slot.count("ranked second to fourth") == slot.count(dated)
+
+
 def _dim_pair(prev_dims, curr_dims):
     """A minimal succession whose two sides carry real 0–1 dimension scores."""
     def sided(name, label, score, dims):
