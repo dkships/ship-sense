@@ -994,6 +994,54 @@ models:
     batch_discount: 0.5          # (notes/hydrogen-2026-11-12/batch_probe.out; gemini-4-argon control)
     price_verified: "2026-11-12"
     price_source: "https://aistudio.google.com/docs/pricing"
+  # Gemini 4 Neon — generally available and added 2026-11-18 (blog.google
+  # introducing-gemini-4-neon, dated Nov 18, 2026; changelog entry of the same day:
+  # "generally available (GA)"). Stable id, no preview label. Paid tier only: "Neon is
+  # available on the paid tier only (not on the free tier)".
+  # A NEW TIER, NO SUCCESSION. The post never says replace, successor or upgrade. Its
+  # positioning line is "While Carbon tackles your hardest, long-horizon projects and
+  # Hydrogen handles fast everyday execution, Neon balances depth and efficiency", and
+  # the docs' what's-new page says "It sits between Gemini 4 Hydrogen and Gemini 4
+  # Carbon for high-frequency complex tasks." No Google page names a model that Neon
+  # replaces: every Gemini 4 model, 3.8 Flash and 3.5 Flash-Lite are still "Stable" with
+  # "No shutdown date announced", and none is newly called previous-generation. So Neon
+  # is a tier beside the others (the Carbon precedent, 2026-11-10), not a successor
+  # (unlike Hydrogen, whose docs named 3.8 Flash as the model to upgrade from): no
+  # `superseded_by`, no succession pair. Google's current tiers are now five, one model
+  # each: Carbon, Argon, Neon, Hydrogen, 3.5 Flash-Lite.
+  # Read on 2026-11-18 and re-read at each publish (the for-sale layer): the what's-new
+  # page's line on which model to use names Neon, Carbon, Hydrogen and 3.5 Flash-Lite
+  # and does not name Argon. That is not a statement about Argon, whose own page is
+  # unchanged, so Argon stays current. The same page's Gemini 3 migration section
+  # ("upgrading from `gemini-3.8-flash` or earlier Gemini 3 models") is general
+  # guidance; 3.8 Flash's successor on the board is Hydrogen.
+  # NO CLAIM PAIR: see the note in hypotheses.yaml v4.10. "Gemini 4 Neon for cyber"
+  # (trusted defenders, Fairwind Program) has no API id and is not scored.
+  # Thinking levels low/medium/high/xhigh, DEFAULT high (like Hydrogen; Carbon and Argon
+  # default to medium); we send no thinking setting. Thinking tokens bill as output.
+  # Context 1,048,576; docs give max output 65,536 by default; models.get on 2026-11-18
+  # reports outputTokenLimit 65,536, batchGenerateContent supported, model_version
+  # "gemini-4-neon" (notes/neon-2026-11-18/models_list.out, facts_probe.out). Model card:
+  # "adapted from Gemini 4 Carbon". Weights not released.
+  - name: gemini-4-neon
+    provider: google
+    id: gemini-4-neon
+    label: "Gemini 4 Neon"
+    released: "2026-11-18"       # blog.google introducing-gemini-4-neon + API changelog (GA)
+    price_in: 3                  # flat across the 1M window; not introductory; cached input $0.15
+    price_out: 15                # (implicit caching only); not on the free tier
+    api: generate_content
+    structured_outputs: true     # JSON response schema accepted 2026-11-18 (facts_probe.out)
+    max_tokens: 65536            # rule 1, 2026-11-18, after the registration commit (4efa33d) and before any
+                                 # scored answer: live sizing probe at 65,536 on the five cases GLM-5.3 (the
+                                 # board's longest-answering model; Neon has no predecessor) answered at
+                                 # greatest length: peak 33,882 = 52% (over 70% of 32,768). Google Batch
+                                 # accepts this cap for Neon (it refuses it for Carbon, the control):
+                                 # notes/neon-2026-11-18/sizing_probe.out, batch_cap_probe.out
+    batch_supported: true        # probed against Google's Batch API 2026-11-18, not the docs
+    batch_discount: 0.5          # (notes/neon-2026-11-18/batch_probe.out; gemini-4-argon control)
+    price_verified: "2026-11-18"
+    price_source: "https://aistudio.google.com/docs/pricing"
   # Flash tiers offer Free Tier access, but official private-bank runs use paid
   # billing/Batch. Google's pricing terms say Free Tier content may be used to
   # improve products; do not send private cases through that path.
